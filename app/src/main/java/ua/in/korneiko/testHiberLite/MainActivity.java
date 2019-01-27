@@ -41,6 +41,11 @@ public class MainActivity extends AppCompatActivity {
         final Post teamLeader = new Post("Team Leader", 1.3);
         final Post ceo = new Post("CEO", 1.6);
 
+//        postTable.add(worker);
+//        postTable.add(leader);
+//        postTable.add(teamLeader);
+//        postTable.add(ceo);
+
         final Employee dvoretskaya = new Employee("Oksans", "Dvoretskaya", 22000, worker);
         final Employee tanya = new Employee("Tatyana", "Chorna", 31000, worker);
 

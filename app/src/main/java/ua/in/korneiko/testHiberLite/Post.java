@@ -1,9 +1,12 @@
 package ua.in.korneiko.testHiberLite;
 
+import org.jetbrains.annotations.Contract;
 import ua.in.korneiko.hiberlite.annotations.*;
 
+import java.util.Objects;
+
 @Entity
-public class Post {
+public class Post implements ua.in.korneiko.hiberlite.Entity {
 
     @Id
     @Autoincrement
@@ -13,6 +16,7 @@ public class Post {
 
     @Column
     @NotNull
+    @SearchKey
     private String postName;
 
     @Column
@@ -32,7 +36,7 @@ public class Post {
         this.salaryCoefficient = salaryCoefficient;
     }
 
-    public long getId() {
+    public int getId() {
         return id;
     }
 
@@ -63,5 +67,19 @@ public class Post {
                 ", postName='" + postName + '\'' +
                 ", salaryCoefficient=" + salaryCoefficient +
                 '}';
+    }
+
+    @Contract(value = "null -> false", pure = true)
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Post post = (Post) o;
+        return Objects.equals(postName, post.postName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(postName);
     }
 }

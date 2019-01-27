@@ -10,6 +10,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 
+import static ua.in.korneiko.hiberlite.GlobalConstants.*;
 import static ua.in.korneiko.testHiberLite.MainActivity.LOG_TAG;
 
 public class TableFactory {
@@ -18,17 +19,19 @@ public class TableFactory {
     //TODO Need to implements! JOIN-columns
     //TODO Need to implements! Collections in tables (Create table - OK, Add - OK, Select - NG)
 
+    private Map<String, Table> tables;
     private static Map<String, List<Table>> joinTables;
     private SQLiteDatabase database;
 
     public TableFactory(SQLiteDatabase sqLiteDatabase) {
         this.database = sqLiteDatabase;
+        tables = new HashMap<>();
         joinTables = new HashMap<>();
     }
 
     public <T> Table<T> createTable(Class<T> entityClass) {
 
-        return this.createTable(entityClass, entityClass.getSimpleName());
+        return this.createTable(entityClass, tableNameToLowerCase(entityClass.getSimpleName()));
     }
 
     private <T> Table<T> createTable(Class<T> entityClass, String determinedTableName) {
@@ -51,10 +54,10 @@ public class TableFactory {
             }
         }
 
-        //Если было отдельно определено имя таблицы, заканчивающееся на "JoinTable",
+        //Если было отдельно определено имя таблицы, заканчивающееся на GlobalConstants.AUX_TAB_SUFFIX,
         //значит необходима вспомогательная таблица (для полей List, Map, etc.)
         //Добавляем в таблицу колонку для идентификации мастер-таблицы
-        if (determinedTableName.endsWith("JoinTable")) {
+        if (determinedTableName.endsWith(AUX_TAB_SUFFIX)) {
             appendColumnNameType(query, "ownerId", Integer.class);
             query.append(", ");
         }
@@ -97,8 +100,11 @@ public class TableFactory {
         Table<T> table = new Table<>(database, entityClass,
                 joinTables.containsKey(determinedTableName) ? joinTables.get(determinedTableName) : new ArrayList<Table>());
 
-        table.setRawQueryCreateTable(query.toString());
+        table.setRawQueryCreateTableString(query.toString());
         table.setTableName(determinedTableName);
+        table.setEntityClass(entityClass);
+        table.setTableFactory(this);
+        tables.put(table.getTableName(), table);
 
         return table;
     }
@@ -154,7 +160,14 @@ public class TableFactory {
             tableName = entityClass.getSimpleName();
         }
 
-        query.append("create table ").append(tableName).append(" (");
+        String tableNameLowerCase = tableNameToLowerCase(tableName);
+
+        query.append("create table ").append(tableNameLowerCase).append(" (");
+    }
+
+    @org.jetbrains.annotations.NotNull
+    private String tableNameToLowerCase(String tableName) {
+        return tableName.substring(0, 1).toLowerCase() + tableName.substring(1);
     }
 
     private void appendColumnPKey(StringBuilder query, Field field) {
@@ -214,9 +227,9 @@ public class TableFactory {
             String actualTypeArgument = actualTypeArguments[0].toString();
             String classForName = actualTypeArgument.split(" ")[1];
             Class<?> genericClass = Class.forName(classForName);
-            if (genericClass.isAnnotationPresent(Entity.class) || SimpleTypesDefinition.isSimpleType(genericClass)) {
+            if (genericClass.isAnnotationPresent(ua.in.korneiko.hiberlite.annotations.Entity.class) || SimpleTypesDefinition.isSimpleType(genericClass)) {
                 final Table<?> table = createTable(genericClass,
-                        field.getName() + "_" + owner.getSimpleName() + "JoinTable");
+                        field.getName() + "_" + owner.getSimpleName() + AUX_TAB_SUFFIX);
                 if (joinTables.containsKey(ownerTableName)) {
                     joinTables.get(ownerTableName).add(table);
                 } else {
@@ -229,6 +242,9 @@ public class TableFactory {
             e.printStackTrace();
         }
     }
+
+    public Table getTable(String tableNameName) {
+
+        return tables.get(tableNameName);
+    }
 }
-
-

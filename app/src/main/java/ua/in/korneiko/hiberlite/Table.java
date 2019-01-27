@@ -5,9 +5,14 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import ua.in.korneiko.hiberlite.annotations.Column;
 import ua.in.korneiko.hiberlite.annotations.Id;
+import ua.in.korneiko.hiberlite.annotations.JoinColumn;
+import ua.in.korneiko.hiberlite.annotations.SearchKey;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+
+import static ua.in.korneiko.hiberlite.GlobalConstants.AUX_TAB_SUFFIX;
 
 public class Table<T> implements DbProvider<T> {
 
@@ -21,6 +26,7 @@ public class Table<T> implements DbProvider<T> {
     private SQLiteDatabase database;
     private List<Table> joinTables = new ArrayList<>();
     private String tableName;
+    private TableFactory tableFactory;
 
     public Table(SQLiteDatabase database, Class<T> entity, List<Table> joinTables) {
         this.database = database;
@@ -32,15 +38,15 @@ public class Table<T> implements DbProvider<T> {
         return rawQueryCreateTableString;
     }
 
-    public void setRawQueryCreateTable(String createTableRawQuery) {
+    public void setRawQueryCreateTableString(String createTableRawQuery) {
         this.rawQueryCreateTableString = createTableRawQuery;
     }
 
-    public Class<T> getEntityClass() {
+    Class<T> getEntityClass() {
         return entityClass;
     }
 
-    public void setEntityClass(Class<T> entityClass) {
+    void setEntityClass(Class<T> entityClass) {
         this.entityClass = entityClass;
     }
 
@@ -103,7 +109,41 @@ public class Table<T> implements DbProvider<T> {
     @Override
     public List<T> find(T item) {
 
-        return null;
+        List<Field> fields = findFieldsByAnnotation(SearchKey.class, item);
+        StringBuilder selectionStringConstruct = new StringBuilder();
+        String[] selectionArgs = new String[fields.size()];
+        List<T> data = new ArrayList<>();
+
+        for (int i = 0; i < fields.size(); i++) {
+            selectionStringConstruct.append(fields.get(i).getName()).append("=?");
+            if (i < (fields.size() - 1)) {
+                selectionStringConstruct.append(" and ");
+            }
+            try {
+                Field field = fields.get(i);
+                Object value = SimpleTypesDefinition.fieldGetValue(field, item);
+                selectionArgs[i] = value.toString();
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                e.printStackTrace();
+            }
+        }
+        String selectionString = selectionStringConstruct.toString();
+
+        Cursor cursor = database.query(tableName,
+                null,
+                selectionString,
+                selectionArgs,
+                null,
+                null,
+                null);
+
+        try {
+            data = getDataFromCursor(cursor);
+        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+        }
+
+        return data;
     }
 
     @Override
@@ -254,48 +294,65 @@ public class Table<T> implements DbProvider<T> {
             for (Field field : fields) {
                 Class<?> fieldType = field.getType();
                 String fieldName = field.getName();
-                if (!field.isAnnotationPresent(Column.class) || field.isAnnotationPresent(Id.class)) continue;
+                if (field.isAnnotationPresent(Id.class)) continue;
+
                 for (Method method : aClass.getMethods()) {
                     if (method.getName().toLowerCase().startsWith("get") || method.getName().toLowerCase().startsWith("is")) {
                         if (method.getName().toLowerCase().endsWith(fieldName.toLowerCase())) {
                             if (method.getName().length() == (fieldName.length() + 3) || method.getName().length() == (fieldName.length() + 2)) {
                                 try {
+                                    //Получение значения поля
                                     invoke = method.invoke(item);
                                     if (invoke == null) continue;
                                 } catch (IllegalAccessException | InvocationTargetException e) {
                                     e.printStackTrace();
                                 }
-                                if (fieldType.equals(Integer.class) || fieldType.equals(int.class))
-                                    contentValues.put(fieldName, (Integer) invoke);
-                                if (fieldType.equals(Double.class) || fieldType.equals(double.class))
-                                    contentValues.put(fieldName, (Double) invoke);
-                                if (fieldType.equals(Long.class) || fieldType.equals(long.class))
-                                    contentValues.put(fieldName, (Long) invoke);
-                                if (fieldType.equals(Boolean.class) || fieldType.equals(boolean.class))
-                                    contentValues.put(fieldName, (Boolean) invoke);
-                                if (fieldType.equals(String.class))
-                                    contentValues.put(fieldName, (String) invoke);
-                                if (fieldType.equals(Date.class))
-                                    contentValues.put(fieldName, ((Date) invoke).getTime());
-                                if (fieldType.equals(List.class)) {
-                                    Type genericType = field.getGenericType();
-                                    if (genericType instanceof ParameterizedType) {
-                                        for (Table joinTable : joinTables) {
-                                            if (joinTable.getTableName().equals(fieldName + "_" + entityClass.getSimpleName() + "JoinTable")) {
-                                                assert invoke != null;
-                                                for (Object o : ((List<?>) invoke)) {
-                                                    contentValues.put("owner", randomKey);
-                                                    joinTable.add(o, randomKey);
+                                if (field.isAnnotationPresent(Column.class)) {
+                                    if (fieldType.equals(Integer.class) || fieldType.equals(int.class))
+                                        contentValues.put(fieldName, (Integer) invoke);
+                                    if (fieldType.equals(Double.class) || fieldType.equals(double.class))
+                                        contentValues.put(fieldName, (Double) invoke);
+                                    if (fieldType.equals(Long.class) || fieldType.equals(long.class))
+                                        contentValues.put(fieldName, (Long) invoke);
+                                    if (fieldType.equals(Boolean.class) || fieldType.equals(boolean.class))
+                                        contentValues.put(fieldName, (Boolean) invoke);
+                                    if (fieldType.equals(String.class))
+                                        contentValues.put(fieldName, (String) invoke);
+                                    if (fieldType.equals(Date.class))
+                                        contentValues.put(fieldName, ((Date) invoke).getTime());
+                                    if (fieldType.equals(List.class)) {
+                                        Type genericType = field.getGenericType();
+                                        if (genericType instanceof ParameterizedType) {
+                                            for (Table joinTable : joinTables) {
+                                                if (joinTable.getTableName().equals(fieldName + "_" + entityClass.getSimpleName() + AUX_TAB_SUFFIX)) {
+                                                    assert invoke != null;
+                                                    for (Object o : ((List<?>) invoke)) {
+                                                        contentValues.put("owner", randomKey);
+                                                        joinTable.add(o, randomKey);
+                                                    }
                                                 }
                                             }
                                         }
                                     }
+                                }
+                                if (field.isAnnotationPresent(JoinColumn.class)) {
+                                    //Получение таблицы из общего списка таблиц
+                                    Table table = tableFactory.getTable(fieldName);
+                                    //Поиск записи в join-таблице соответствующее значению поля в главной таблице
+                                    List<Entity> joinedTableObjects = table.find(invoke);
+                                    Entity entity = !joinedTableObjects.isEmpty() ? joinedTableObjects.get(0) : null;
+                                    assert entity != null;
+                                    //Получение ID записи
+                                    int entityId = entity.getId();
+                                    //Добавление ID в главную таблицу, указывающего на запись в join-таблице
+                                    contentValues.put(fieldName, entityId);
                                 }
                             }
                         }
                     }
                 }
             }
+
         }
         tablesFinished.put(getTableName(), true);
         return contentValues;
@@ -315,15 +372,27 @@ public class Table<T> implements DbProvider<T> {
                 }
 
                 for (Field field : fields) {
-                    if (!field.isAnnotationPresent(Column.class)) continue;
-
                     String fieldName = field.getName();
                     Class<?> fieldType = field.getType();
-                    int columnIndex = cursor.getColumnIndex(fieldName);
                     String methodName = generateMethodName(fieldName);
-                    Method method = entityClass.getMethod(methodName, fieldType);
+                    int columnIndex = cursor.getColumnIndex(fieldName);
 
-                    method.invoke(instance, SimpleTypesDefinition.invokeCursorGetMethod(cursor, columnIndex, fieldType));
+                    if (field.isAnnotationPresent(Column.class)) {
+                        Method method = entityClass.getMethod(methodName, fieldType);
+                        method.invoke(instance, SimpleTypesDefinition.invokeCursorGetMethod(cursor, columnIndex, fieldType));
+                    }
+
+                    if (field.isAnnotationPresent(JoinColumn.class)) {
+                        Method method = entityClass.getMethod(methodName, fieldType);
+                        if (SimpleTypesDefinition.isSimpleType(fieldType)) {
+                            int idInJoinedTable = cursor.getInt(columnIndex);
+                            Table joinedTable = tableFactory.getTable(fieldName);
+                            Object joinedEntity = joinedTable.find(idInJoinedTable);
+                            method.invoke(instance, joinedEntity);
+                        } else {
+                            throw new NoSuchMethodException("Coming soon");
+                        }
+                    }
                 }
                 result.add(instance);
             } while (cursor.moveToNext());
@@ -337,5 +406,24 @@ public class Table<T> implements DbProvider<T> {
         String firstLetter = stringBuilder.substring(0, 1);
         StringBuilder methodName = stringBuilder.replace(0, 1, "set" + firstLetter.toUpperCase());
         return methodName.toString();
+    }
+
+    public TableFactory getTableFactory() {
+        return this.tableFactory;
+    }
+
+    public void setTableFactory(TableFactory tableFactory) {
+        this.tableFactory = tableFactory;
+    }
+
+    private List<Field> findFieldsByAnnotation(Class<? extends Annotation> annotation, T item) {
+        ArrayList<Field> fields = new ArrayList<>();
+
+        for (Field field : item.getClass().getDeclaredFields()) {
+            if (field.isAnnotationPresent(annotation)) {
+                fields.add(field);
+            }
+        }
+        return fields;
     }
 }

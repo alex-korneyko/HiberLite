@@ -4,8 +4,10 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Date;
 
 public class SimpleTypesDefinition {
@@ -65,22 +67,29 @@ public class SimpleTypesDefinition {
         T instance = null;
 
         if (type.equals(Integer.class) || type.equals(int.class)) {
-            instance = type.getConstructor(Integer.class).newInstance(cursor.getInt(columnIndex));
+            int intValue = cursor.getInt(columnIndex);
+            Constructor<Integer> constructor = Integer.class.getConstructor(int.class);
+            instance = (T) constructor.newInstance(intValue);
         }
         if (type.equals(Double.class) || type.equals(double.class)) {
-            instance = type.getConstructor(Double.class).newInstance(cursor.getDouble(columnIndex));
+            Constructor<Double> constructor = Double.class.getConstructor(double.class);
+            instance = (T) constructor.newInstance(cursor.getDouble(columnIndex));
         }
         if (type.equals(Long.class) || type.equals(long.class)) {
-            instance = type.getConstructor(Long.class).newInstance(cursor.getLong(columnIndex));
+            Constructor<Long> constructor = Long.class.getConstructor(Long.class);
+            instance = (T) constructor.newInstance(cursor.getLong(columnIndex));
         }
         if (type.equals(Boolean.class) || type.equals(boolean.class)) {
-            instance = type.getConstructor(Boolean.class).newInstance(cursor.getInt(columnIndex) > 0);
+            Constructor<Boolean> constructor = Boolean.class.getConstructor(Boolean.class);
+            instance = (T) constructor.newInstance(cursor.getInt(columnIndex) > 0);
         }
         if (type.equals(String.class)) {
-            instance = type.getConstructor(String.class).newInstance(cursor.getString(columnIndex));
+            Constructor<String> constructor = String.class.getConstructor(String.class);
+            instance = (T) constructor.newInstance(cursor.getString(columnIndex));
         }
         if (type.equals(Date.class)) {
-            instance = type.getConstructor(Date.class).newInstance(new java.sql.Date(cursor.getLong(columnIndex)));
+            Constructor<Date> constructor = Date.class.getConstructor(Date.class);
+            instance = (T) constructor.newInstance(new java.sql.Date(cursor.getLong(columnIndex)));
         }
 
         return instance;
@@ -108,5 +117,20 @@ public class SimpleTypesDefinition {
             contentValues.put(columnName, ((Date) item).getTime());
         }
 
+    }
+
+    public static <T> Object fieldGetValue(Field field, T object) throws InvocationTargetException, IllegalAccessException {
+        Object invoke = null;
+        String fieldName = field.getName();
+        for (Method method : object.getClass().getMethods()) {
+            if (method.getName().toLowerCase().startsWith("get") || method.getName().toLowerCase().startsWith("is")) {
+                if (method.getName().toLowerCase().endsWith(fieldName.toLowerCase())) {
+                    if (method.getName().length() == (fieldName.length() + 3) || method.getName().length() == (fieldName.length() + 2)) {
+                        invoke = method.invoke(object);
+                    }
+                }
+            }
+        }
+        return invoke;
     }
 }

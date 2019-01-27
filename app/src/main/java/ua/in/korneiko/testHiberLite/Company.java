@@ -1,15 +1,14 @@
 package ua.in.korneiko.testHiberLite;
 
-import ua.in.korneiko.hiberlite.annotations.Autoincrement;
-import ua.in.korneiko.hiberlite.annotations.Column;
-import ua.in.korneiko.hiberlite.annotations.Entity;
-import ua.in.korneiko.hiberlite.annotations.Id;
+import org.jetbrains.annotations.Contract;
+import ua.in.korneiko.hiberlite.annotations.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
-public class Company {
+public class Company implements ua.in.korneiko.hiberlite.Entity {
 
     @Id
     @Autoincrement
@@ -17,6 +16,7 @@ public class Company {
     private int id;
 
     @Column
+    @SearchKey
     private String companyName;
 
     @Column
@@ -92,5 +92,19 @@ public class Company {
                 ", companyLegalAddress='" + companyLegalAddress + '\'' +
                 ", branches=" + branches +
                 '}';
+    }
+
+    @Contract(value = "null -> false", pure = true)
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Company company = (Company) o;
+        return Objects.equals(companyName, company.companyName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(companyName);
     }
 }
