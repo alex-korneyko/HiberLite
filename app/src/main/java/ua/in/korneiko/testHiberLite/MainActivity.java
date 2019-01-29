@@ -18,33 +18,42 @@ public class MainActivity extends AppCompatActivity {
     private DataBase dataBase;
     private Table<Company> companyTable;
     private Table<Post> postTable;
+    private Table<LegalAddress> legalAddressTable;
+
+    private Post worker;
+    private Post leader;
+    private Post teamLeader;
+    private Post ceo;
+
+    private LegalAddress legalAddress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        dataBase = new DataBase(this, "testDB", 1);
+        worker = new Post("Worker", 1.0);
+        leader = new Post("Leader", 1.1);
+        teamLeader = new Post("Team Leader", 1.3);
+        ceo = new Post("CEO", 1.6);
+
+        legalAddress = new LegalAddress(66400, "Poland", "Gorzow WLKP", "Pilsudskiego 9, 511b");
+
+        dataBase = new DataBase(this, "testDB");
         tableFactory = new TableFactory(dataBase.getDatabase());
 
         companyTable = tableFactory.createTable(Company.class);
         postTable = tableFactory.createTable(Post.class);
-
-        return;
-
-    }
-
-    public void onClickAdd(View view) {
-
-        final Post worker = new Post("Worker", 1.0);
-        final Post leader = new Post("Leader", 1.1);
-        final Post teamLeader = new Post("Team Leader", 1.3);
-        final Post ceo = new Post("CEO", 1.6);
+        legalAddressTable = tableFactory.createTable(LegalAddress.class);
 
 //        postTable.add(worker);
 //        postTable.add(leader);
 //        postTable.add(teamLeader);
 //        postTable.add(ceo);
+//        legalAddressTable.add(legalAddress);
+    }
+
+    public void onClickAdd(View view) {
 
         final Employee dvoretskaya = new Employee("Oksans", "Dvoretskaya", 22000, worker);
         final Employee tanya = new Employee("Tatyana", "Chorna", 31000, worker);
@@ -54,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
             add(new Employee("Roman", "Krychun", 10000, leader));
         }});
 
-        londonBranch.setOtherListData(new ArrayList<String>(){{
+        londonBranch.setOtherListData(new ArrayList<String>() {{
             add("first");
             add("second");
             add("third");
@@ -65,18 +74,19 @@ public class MainActivity extends AppCompatActivity {
             add(new Employee("Roman", "Miroshnik", 12000, worker));
         }});
 
-        usaBranch.setOtherListData(new ArrayList<String>(){{
+        usaBranch.setOtherListData(new ArrayList<String>() {{
             add("fourth");
             add("fifth");
             add("sixth");
         }});
 
-        Company company = new Company("Alfa-Company", "Poland, Gorzow WLKP, Pilsudskiego 9, 511b", new ArrayList<Branch>() {{
+
+        Company company = new Company("Alfa-Company", legalAddress, new ArrayList<Branch>() {{
             add(londonBranch);
             add(usaBranch);
         }});
 
-        company.setMainOfficeEmployees(new ArrayList<Employee>(){{
+        company.setMainOfficeEmployees(new ArrayList<Employee>() {{
             add(dvoretskaya);
             add(tanya);
         }});
@@ -88,6 +98,8 @@ public class MainActivity extends AppCompatActivity {
 
     public void onClickGetId1(View view) {
 
+        Company company = companyTable.find(1);
+        Log.d(LOG_TAG, company.toString());
     }
 
     public void onClickGetAll(View view) {

@@ -14,9 +14,7 @@ public interface DbProvider<T> {
 
     public long add(T item);
 
-    public boolean edit(T item);
-
-    public boolean edit(long id, T item);
+    public boolean edit(int id, T item);
 
     public List<Long> addAll(Iterable<? extends T> items);
 

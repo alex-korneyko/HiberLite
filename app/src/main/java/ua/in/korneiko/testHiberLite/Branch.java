@@ -86,11 +86,12 @@ public class Branch {
 
     @Override
     public String toString() {
-        return "Branch{" +
-                "id=" + id +
-                ", branchName='" + branchName + '\'' +
-                ", branchAddress='" + branchAddress + '\'' +
-                ", employees=" + employees +
-                '}';
+        return "\nBranch{" +
+                "\n\tid=" + id +
+                ", \n\tbranchName='" + branchName + '\'' +
+                ", \n\tbranchAddress='" + branchAddress + '\'' +
+                ", \n\temployees=" + employees +
+                ", \n\totherListData=" + otherListData +
+                "\n}";
     }
 }

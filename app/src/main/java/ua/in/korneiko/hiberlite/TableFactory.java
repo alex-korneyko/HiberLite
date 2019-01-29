@@ -10,7 +10,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 
-import static ua.in.korneiko.hiberlite.GlobalConstants.*;
+import static ua.in.korneiko.hiberlite.GlobalConstants.AUX_TAB_SUFFIX;
 import static ua.in.korneiko.testHiberLite.MainActivity.LOG_TAG;
 
 public class TableFactory {
@@ -19,8 +19,8 @@ public class TableFactory {
     //TODO Need to implements! JOIN-columns
     //TODO Need to implements! Collections in tables (Create table - OK, Add - OK, Select - NG)
 
-    private Map<String, Table> tables;
     private static Map<String, List<Table>> joinTables;
+    private Map<String, Table> tables;
     private SQLiteDatabase database;
 
     public TableFactory(SQLiteDatabase sqLiteDatabase) {

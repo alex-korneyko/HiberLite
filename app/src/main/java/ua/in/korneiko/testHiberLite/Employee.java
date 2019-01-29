@@ -43,4 +43,13 @@ public class Employee extends Person {
     public void setPost(Post post) {
         this.post = post;
     }
+
+    @Override
+    public String toString() {
+        return "\nEmployee{" +
+                super.toString() +
+                "\n\t salary=" + salary +
+                ",\n\t post=" + post +
+                "\n} ";
+    }
 }

@@ -152,6 +152,28 @@ public class Table<T> implements DbProvider<T> {
     }
 
 
+    private List<T> filterByOwnerId(int ownerId) {
+
+        List<T> data = new ArrayList<>();
+
+        Cursor cursor = database.query(tableName,
+                null,
+                "ownerId=?",
+                new String[]{String.valueOf(ownerId)},
+                null,
+                null,
+                null
+        );
+
+        try {
+            data = getDataFromCursor(cursor);
+        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+        }
+
+        return data;
+    }
+
     private long add(T item, long ownerId) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
 
         boolean allTablesFinished = true;
@@ -192,6 +214,7 @@ public class Table<T> implements DbProvider<T> {
 
                     //Запись в базу строки и получение реального id для этой строки
                     long ownerIdAfterInsert = database.insert(tableName, null, values);
+                    values.put("_idAI", ownerIdAfterInsert);
 
                     //Пробегаем по наборам contentValues (CV) каждой таблицы, чтобы найти CV с соответствующим случайно-сгенеринный owner-id
                     //соответствующим уже записаной строке
@@ -205,12 +228,21 @@ public class Table<T> implements DbProvider<T> {
                             if (contentValuesForRow.containsKey("ownerId") && contentValuesForRow.getAsInteger("ownerId").equals(ownerIdRndGenerated)) {
 
                                 //Заменяем старый случайный ownerId на новй, из базы ownerId
-                                contentValuesForRow.put("ownerId", ownerIdAfterInsert);
+                                contentValuesForRow.put("ownerId", values.getAsInteger("_idAI"));
                             }
                         }
                     }
                 }
             }
+
+            for (String tableName : contentValuesList.keySet()) {
+                for (ContentValues values : contentValuesList.get(tableName)) {
+                    Integer idAfterInsert = values.getAsInteger("_idAI");
+                    values.remove("_idAI");
+                    edit(tableName, idAfterInsert, values);
+                }
+            }
+
             contentValuesList.clear();
         }
 
@@ -232,14 +264,49 @@ public class Table<T> implements DbProvider<T> {
     }
 
     @Override
-    public boolean edit(T item) {
+    public boolean edit(int id, T item) {
 
-        return false;
+        ContentValues contentValues = null;
+        int updateId = 0;
+
+        try {
+            contentValues = generateContentValues(item);
+        } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException | InstantiationException e) {
+            e.printStackTrace();
+        }
+
+        if (contentValues != null) {
+            updateId = database.update(getTableName(), contentValues, "id=?", new String[]{String.valueOf(id)});
+        }
+
+        return updateId > 0;
     }
 
-    @Override
-    public boolean edit(long id, T item) {
-        return false;
+    private boolean edit(String tableName, int id, ContentValues values) {
+
+        int update = 0;
+        Cursor cursor;
+
+        cursor = database.query(
+                "sqlite_master",
+                new String[]{"sql"},
+                "tbl_name=?",
+                new String[]{tableName},
+                null,
+                null,
+                null);
+
+        if (cursor.moveToFirst()) {
+            String sql = cursor.getString(cursor.getColumnIndex("sql"));
+            if (sql.contains(" id ")) {
+                update = database.update(tableName, values, "id=?", new String[]{String.valueOf(id)});
+            }
+        }
+
+        cursor.close();
+
+
+        return update > 0;
     }
 
     @Override
@@ -361,36 +428,56 @@ public class Table<T> implements DbProvider<T> {
     private List<T> getDataFromCursor(Cursor cursor) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
 
         List<T> result = new ArrayList<>();
+        int entityId = 0;
 
         if (cursor.moveToFirst()) {
             do {
-                T instance = entityClass.newInstance();
+                T instance;
+                if (SimpleTypesDefinition.isSimpleType(entityClass)) {
+                    instance = SimpleTypesDefinition.invokeCursorGetMethod(
+                            cursor, cursor.getColumnIndex(entityClass.getSimpleName()), entityClass);
+                } else {
 
-                List<Field> fields = new ArrayList<>();
-                for (Class cls = entityClass; cls != null; cls = cls.getSuperclass()) {
-                    fields.addAll(Arrays.asList(cls.getDeclaredFields()));
-                }
+                    instance = entityClass.newInstance();
 
-                for (Field field : fields) {
-                    String fieldName = field.getName();
-                    Class<?> fieldType = field.getType();
-                    String methodName = generateMethodName(fieldName);
-                    int columnIndex = cursor.getColumnIndex(fieldName);
-
-                    if (field.isAnnotationPresent(Column.class)) {
-                        Method method = entityClass.getMethod(methodName, fieldType);
-                        method.invoke(instance, SimpleTypesDefinition.invokeCursorGetMethod(cursor, columnIndex, fieldType));
+                    List<Field> fields = new ArrayList<>();
+                    for (Class cls = entityClass; cls != null; cls = cls.getSuperclass()) {
+                        fields.addAll(Arrays.asList(cls.getDeclaredFields()));
                     }
 
-                    if (field.isAnnotationPresent(JoinColumn.class)) {
-                        Method method = entityClass.getMethod(methodName, fieldType);
-                        if (SimpleTypesDefinition.isSimpleType(fieldType)) {
+                    for (Field field : fields) {
+                        if (field.isAnnotationPresent(Column.class) && field.isAnnotationPresent(Id.class)) {
+                            int columnIndex = cursor.getColumnIndex(field.getName());
+                            entityId = ((Integer) SimpleTypesDefinition.invokeCursorGetMethod(cursor, columnIndex, field.getType()));
+                        }
+                    }
+
+                    for (Field field : fields) {
+                        String fieldName = field.getName();
+                        Class<?> fieldType = field.getType();
+                        String methodName = generateMethodName(fieldName);
+                        int columnIndex = cursor.getColumnIndex(fieldName);
+
+
+                        if (field.isAnnotationPresent(Column.class)) {
+                            Method method = entityClass.getMethod(methodName, fieldType);
+                            if (fieldType.equals(List.class)) {
+                                Table joinedTable = tableFactory.getTable(
+                                        fieldName + "_" + entityClass.getSimpleName() + GlobalConstants.AUX_TAB_SUFFIX);
+                                List objectsForOwner = joinedTable.filterByOwnerId(entityId);
+                                method.invoke(instance, objectsForOwner);
+                            } else {
+                                Object dataFromCursor = SimpleTypesDefinition.invokeCursorGetMethod(cursor, columnIndex, fieldType);
+                                method.invoke(instance, dataFromCursor);
+                            }
+                        }
+
+                        if (field.isAnnotationPresent(JoinColumn.class)) {
+                            Method method = entityClass.getMethod(methodName, fieldType);
                             int idInJoinedTable = cursor.getInt(columnIndex);
                             Table joinedTable = tableFactory.getTable(fieldName);
                             Object joinedEntity = joinedTable.find(idInJoinedTable);
                             method.invoke(instance, joinedEntity);
-                        } else {
-                            throw new NoSuchMethodException("Coming soon");
                         }
                     }
                 }

@@ -119,7 +119,7 @@ public class SimpleTypesDefinition {
 
     }
 
-    public static <T> Object fieldGetValue(Field field, T object) throws InvocationTargetException, IllegalAccessException {
+    static <T> Object fieldGetValue(Field field, T object) throws InvocationTargetException, IllegalAccessException {
         Object invoke = null;
         String fieldName = field.getName();
         for (Method method : object.getClass().getMethods()) {

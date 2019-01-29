@@ -19,8 +19,8 @@ public class Company implements ua.in.korneiko.hiberlite.Entity {
     @SearchKey
     private String companyName;
 
-    @Column
-    private String companyLegalAddress;
+    @JoinColumn
+    private LegalAddress legalAddress;
 
     @Column
     private List<Branch> branches = new ArrayList<>();
@@ -31,16 +31,16 @@ public class Company implements ua.in.korneiko.hiberlite.Entity {
     public Company() {
     }
 
-    public Company(String companyName, String companyLegalAddress, List<Branch> branches) {
+    public Company(String companyName, LegalAddress legalAddress, List<Branch> branches) {
         this.companyName = companyName;
-        this.companyLegalAddress = companyLegalAddress;
+        this.legalAddress = legalAddress;
         this.branches = branches;
     }
 
-    public Company(int id, String companyName, String companyLegalAddress, List<Branch> branches) {
+    public Company(int id, String companyName, LegalAddress legalAddress, List<Branch> branches) {
         this.id = id;
         this.companyName = companyName;
-        this.companyLegalAddress = companyLegalAddress;
+        this.legalAddress = legalAddress;
         this.branches = branches;
     }
 
@@ -60,12 +60,12 @@ public class Company implements ua.in.korneiko.hiberlite.Entity {
         this.companyName = companyName;
     }
 
-    public String getCompanyLegalAddress() {
-        return companyLegalAddress;
+    public LegalAddress getLegalAddress() {
+        return legalAddress;
     }
 
-    public void setCompanyLegalAddress(String companyLegalAddress) {
-        this.companyLegalAddress = companyLegalAddress;
+    public void setLegalAddress(LegalAddress legalAddress) {
+        this.legalAddress = legalAddress;
     }
 
     public List<Branch> getBranches() {
@@ -87,10 +87,11 @@ public class Company implements ua.in.korneiko.hiberlite.Entity {
     @Override
     public String toString() {
         return "Company{" +
-                "id=" + id +
-                ", companyName='" + companyName + '\'' +
-                ", companyLegalAddress='" + companyLegalAddress + '\'' +
-                ", branches=" + branches +
+                "\nid=" + id +
+                ", \ncompanyName='" + companyName + '\'' +
+                ", \nmainOfficeEmployees=" + mainOfficeEmployees +
+                ", \nlegalAddress=" + legalAddress +
+                ", \nbranches=" + branches +
                 '}';
     }
 
