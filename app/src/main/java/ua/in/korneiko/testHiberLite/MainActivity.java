@@ -46,39 +46,43 @@ public class MainActivity extends AppCompatActivity {
         postTable = tableFactory.createTable(Post.class);
         legalAddressTable = tableFactory.createTable(LegalAddress.class);
 
-//        postTable.add(worker);
-//        postTable.add(leader);
-//        postTable.add(teamLeader);
-//        postTable.add(ceo);
-//        legalAddressTable.add(legalAddress);
+        postTable.add(worker);
+        postTable.add(leader);
+        postTable.add(teamLeader);
+        postTable.add(ceo);
+        legalAddressTable.add(legalAddress);
     }
 
     public void onClickAdd(View view) {
 
         final Employee dvoretskaya = new Employee("Oksans", "Dvoretskaya", 22000, worker);
         final Employee tanya = new Employee("Tatyana", "Chorna", 31000, worker);
+        final Employee teamLeaderLondonBranch = new Employee("Mariana", "Benca", 35000, teamLeader);
+        final Employee teamLeaderUSABranch = new Employee("Anastasia", "Nic", 36000, teamLeader);
 
         final Branch londonBranch = new Branch("Europe-branch", "London, Holms street, 9", new ArrayList<Employee>() {{
             add(new Employee("Alex", "Rootoff", 50000, ceo));
             add(new Employee("Roman", "Krychun", 10000, leader));
-        }});
-
-        londonBranch.setOtherListData(new ArrayList<String>() {{
-            add("first");
-            add("second");
-            add("third");
-        }});
+        }}) {{
+            setHeadmaster(teamLeaderLondonBranch);
+            setOtherListData(new ArrayList<String>() {{
+                add("first");
+                add("second");
+                add("third");
+            }});
+        }};
 
         final Branch usaBranch = new Branch("USA-branch", "NY, Wall Street, 22", new ArrayList<Employee>() {{
             add(new Employee("Andrey", "Korneiko", 40000, teamLeader));
             add(new Employee("Roman", "Miroshnik", 12000, worker));
-        }});
-
-        usaBranch.setOtherListData(new ArrayList<String>() {{
-            add("fourth");
-            add("fifth");
-            add("sixth");
-        }});
+        }}) {{
+            setHeadmaster(teamLeaderUSABranch);
+            setOtherListData(new ArrayList<String>() {{
+                add("fourth");
+                add("fifth");
+                add("sixth");
+            }});
+        }};
 
 
         Company company = new Company("Alfa-Company", legalAddress, new ArrayList<Branch>() {{

@@ -95,9 +95,8 @@ public class SimpleTypesDefinition {
         return instance;
     }
 
-    static <T> void invokeContentValuesPutMethod(ContentValues contentValues, @NotNull T item) {
+    static <T> void invokeContentValuesPutMethod(ContentValues contentValues, String columnName, @NotNull T item) {
 
-        String columnName = item.getClass().getSimpleName();
         if (item instanceof Integer) {
             contentValues.put(columnName, (Integer) item);
         }

@@ -16,8 +16,6 @@ import static ua.in.korneiko.testHiberLite.MainActivity.LOG_TAG;
 public class TableFactory {
 
     //TODO Need to implements! TableUpdate (if the class-entity was changed)
-    //TODO Need to implements! JOIN-columns
-    //TODO Need to implements! Collections in tables (Create table - OK, Add - OK, Select - NG)
 
     private static Map<String, List<Table>> joinTables;
     private Map<String, Table> tables;
@@ -66,6 +64,13 @@ public class TableFactory {
             //Пробегаем по всем полям, создаём колонки для них
             for (Field field : fields) {
                 if (!(field.isAnnotationPresent(Column.class) || field.isAnnotationPresent(JoinColumn.class))) continue;
+
+                if (!SimpleTypesDefinition.isSimpleType(field) && !(field.getType().equals(List.class) || field.getType().equals(Map.class))) {
+                    if (!field.isAnnotationPresent(JoinColumn.class)) {
+                        throw new IllegalArgumentException("Not simple types must be annotated as \"@JoinColumn\". " +
+                                field.getType().getName() + " - is not simple type! Table: " + determinedTableName);
+                    }
+                }
 
                 //Если метод добавления колонки вернул false, то колонка не добавлена, значит метод наткнулся
                 //на поле типа List, Map, etc. Для такого поля колонка не нужна, пропускаем оставшуюся часть

@@ -1,9 +1,6 @@
 package ua.in.korneiko.testHiberLite;
 
-import ua.in.korneiko.hiberlite.annotations.Autoincrement;
-import ua.in.korneiko.hiberlite.annotations.Column;
-import ua.in.korneiko.hiberlite.annotations.Entity;
-import ua.in.korneiko.hiberlite.annotations.Id;
+import ua.in.korneiko.hiberlite.annotations.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +18,9 @@ public class Branch {
 
     @Column
     private String branchAddress;
+
+    @JoinColumn
+    private Employee headmaster;
 
     @Column
     private List<Employee> employees = new ArrayList<>();
@@ -68,6 +68,14 @@ public class Branch {
         this.branchAddress = branchAddress;
     }
 
+    public Employee getHeadmaster() {
+        return headmaster;
+    }
+
+    public void setHeadmaster(Employee headmaster) {
+        this.headmaster = headmaster;
+    }
+
     public List<Employee> getEmployees() {
         return employees;
     }
@@ -90,6 +98,7 @@ public class Branch {
                 "\n\tid=" + id +
                 ", \n\tbranchName='" + branchName + '\'' +
                 ", \n\tbranchAddress='" + branchAddress + '\'' +
+                ", \n\theadmaster='" + headmaster + '\'' +
                 ", \n\temployees=" + employees +
                 ", \n\totherListData=" + otherListData +
                 "\n}";

@@ -345,13 +345,13 @@ public class Table<T> implements DbProvider<T> {
 
     private ContentValues generateContentValues(T item) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         ContentValues contentValues = new ContentValues();
-        Object invoke = null;
+        Object invokedResultGetMethod = null;
         List<Field> fields = new ArrayList<>();
         tablesFinished.put(getTableName(), false);
         long randomKey = Math.round(Math.random() * 1000000);
 
         if (SimpleTypesDefinition.isSimpleType(item.getClass())) {
-            SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, item);
+            SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, item.getClass().getSimpleName(), item);
         } else {
             for (Class cls = item.getClass(); cls != null; cls = cls.getSuperclass()) {
                 fields.addAll(Arrays.asList(cls.getDeclaredFields()));
@@ -369,31 +369,28 @@ public class Table<T> implements DbProvider<T> {
                             if (method.getName().length() == (fieldName.length() + 3) || method.getName().length() == (fieldName.length() + 2)) {
                                 try {
                                     //Получение значения поля
-                                    invoke = method.invoke(item);
-                                    if (invoke == null) continue;
+                                    invokedResultGetMethod = method.invoke(item);
+                                    if (invokedResultGetMethod == null) continue;
                                 } catch (IllegalAccessException | InvocationTargetException e) {
                                     e.printStackTrace();
                                 }
                                 if (field.isAnnotationPresent(Column.class)) {
-                                    if (fieldType.equals(Integer.class) || fieldType.equals(int.class))
-                                        contentValues.put(fieldName, (Integer) invoke);
-                                    if (fieldType.equals(Double.class) || fieldType.equals(double.class))
-                                        contentValues.put(fieldName, (Double) invoke);
-                                    if (fieldType.equals(Long.class) || fieldType.equals(long.class))
-                                        contentValues.put(fieldName, (Long) invoke);
-                                    if (fieldType.equals(Boolean.class) || fieldType.equals(boolean.class))
-                                        contentValues.put(fieldName, (Boolean) invoke);
-                                    if (fieldType.equals(String.class))
-                                        contentValues.put(fieldName, (String) invoke);
-                                    if (fieldType.equals(Date.class))
-                                        contentValues.put(fieldName, ((Date) invoke).getTime());
+                                    if (SimpleTypesDefinition.isSimpleType(fieldType)) {
+                                        SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, fieldName, invokedResultGetMethod);
+                                    } else {
+                                        if (!fieldType.equals(List.class) && !fieldType.equals(Map.class)) {
+                                            throw new IllegalArgumentException("Not simple classes must be annotated as @JoinColumn" +
+                                                    field.getName() + " - is not simple!");
+                                        }
+                                    }
+
                                     if (fieldType.equals(List.class)) {
                                         Type genericType = field.getGenericType();
                                         if (genericType instanceof ParameterizedType) {
                                             for (Table joinTable : joinTables) {
                                                 if (joinTable.getTableName().equals(fieldName + "_" + entityClass.getSimpleName() + AUX_TAB_SUFFIX)) {
-                                                    assert invoke != null;
-                                                    for (Object o : ((List<?>) invoke)) {
+                                                    assert invokedResultGetMethod != null;
+                                                    for (Object o : ((List<?>) invokedResultGetMethod)) {
                                                         contentValues.put("owner", randomKey);
                                                         joinTable.add(o, randomKey);
                                                     }
@@ -406,7 +403,7 @@ public class Table<T> implements DbProvider<T> {
                                     //Получение таблицы из общего списка таблиц
                                     Table table = tableFactory.getTable(fieldName);
                                     //Поиск записи в join-таблице соответствующее значению поля в главной таблице
-                                    List<Entity> joinedTableObjects = table.find(invoke);
+                                    List<Entity> joinedTableObjects = table.find(invokedResultGetMethod);
                                     Entity entity = !joinedTableObjects.isEmpty() ? joinedTableObjects.get(0) : null;
                                     assert entity != null;
                                     //Получение ID записи

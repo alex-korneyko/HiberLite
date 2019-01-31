@@ -25,7 +25,8 @@ public class Company implements ua.in.korneiko.hiberlite.Entity {
     @Column
     private List<Branch> branches = new ArrayList<>();
 
-    @Column
+    //TODO !!! Need to implements! support of Lists in @JoinColumn
+    @JoinColumn
     private List<Employee> mainOfficeEmployees = new ArrayList<>();
 
     public Company() {

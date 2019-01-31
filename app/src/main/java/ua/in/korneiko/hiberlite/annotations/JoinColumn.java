@@ -12,4 +12,6 @@ public @interface JoinColumn {
     String tsbleName() default "";
 
     FetchMode fetch() default FetchMode.INSTANTLY;
+
+    boolean createIfAbsent() default false;
 }
