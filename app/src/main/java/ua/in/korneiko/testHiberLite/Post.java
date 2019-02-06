@@ -1,12 +1,13 @@
 package ua.in.korneiko.testHiberLite;
 
 import org.jetbrains.annotations.Contract;
+import ua.in.korneiko.hiberlite.EntityObject;
 import ua.in.korneiko.hiberlite.annotations.*;
 
 import java.util.Objects;
 
 @Entity
-public class Post implements ua.in.korneiko.hiberlite.Entity {
+public class Post implements EntityObject {
 
     @Id
     @Autoincrement
@@ -16,6 +17,7 @@ public class Post implements ua.in.korneiko.hiberlite.Entity {
 
     @Column
     @NotNull
+    @Unique
     @SearchKey
     private String postName;
 

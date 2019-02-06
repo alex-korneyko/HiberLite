@@ -1,6 +1,7 @@
 package ua.in.korneiko.testHiberLite;
 
 import org.jetbrains.annotations.Contract;
+import ua.in.korneiko.hiberlite.EntityObject;
 import ua.in.korneiko.hiberlite.annotations.*;
 
 import java.util.ArrayList;
@@ -8,7 +9,7 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
-public class Company implements ua.in.korneiko.hiberlite.Entity {
+public class Company implements EntityObject {
 
     @Id
     @Autoincrement
@@ -25,7 +26,7 @@ public class Company implements ua.in.korneiko.hiberlite.Entity {
     @Column
     private List<Branch> branches = new ArrayList<>();
 
-    //TODO !!! Need to implements! support of Lists in @JoinColumn
+    //TODO !!! Need to implements! support of Lists in @JoinColumn (Create - OK, Add - NG, Select - NG)
     @JoinColumn
     private List<Employee> mainOfficeEmployees = new ArrayList<>();
 

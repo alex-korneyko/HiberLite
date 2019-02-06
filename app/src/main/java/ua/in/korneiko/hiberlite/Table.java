@@ -3,6 +3,7 @@ package ua.in.korneiko.hiberlite;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import org.jetbrains.annotations.NotNull;
 import ua.in.korneiko.hiberlite.annotations.Column;
 import ua.in.korneiko.hiberlite.annotations.Id;
 import ua.in.korneiko.hiberlite.annotations.JoinColumn;
@@ -12,11 +13,10 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
 
-import static ua.in.korneiko.hiberlite.GlobalConstants.AUX_TAB_SUFFIX;
+import static ua.in.korneiko.hiberlite.GlobalConstants.JOIN_TAB_SUFFIX;
 
 public class Table<T> implements DbProvider<T> {
 
-    //TODO Need to implements! Select from JOIN-tables
     //TODO Need to implements! Manipulations with date. Selections with before, after. between
 
     private static TreeMap<String, ArrayList<ContentValues>> contentValuesList = new TreeMap<>();
@@ -174,7 +174,9 @@ public class Table<T> implements DbProvider<T> {
         return data;
     }
 
-    private long add(T item, long ownerId) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
+    private long add(T item, long ownerId)
+            throws NoSuchMethodException, InstantiationException, IllegalAccessException,
+            InvocationTargetException, ClassNotFoundException {
 
         boolean allTablesFinished = true;
 
@@ -198,48 +200,76 @@ public class Table<T> implements DbProvider<T> {
         Integer ownerIdRndGenerated;
 
         if (allTablesFinished) {
-            System.out.println();
-            //Пробегаем по наборам contentValues (CV) каждой таблицы
-            for (String tableName : contentValuesList.keySet()) {
-                //Получаем нбор CV для конкретной таблицы
-                ArrayList<ContentValues> contentValuesForTable = contentValuesList.get(tableName);
 
-                //Пробегаем по набору CV для конкретной таблицы (CV для каждой строки в базу)
-                for (ContentValues values : contentValuesForTable) {
-                    //Поучаем случайно-сгенеринный owner-id идентификатор для текущей табл.
-                    ownerIdRndGenerated = values.getAsInteger("owner");
+            //Получаем нбор CV для конкретной таблицы
+            ArrayList<ContentValues> contentValuesForTable = contentValuesList.get(getTableName());
 
-                    //Удаляем идентификатор. Для него нет колонки в таблице
-                    values.remove("owner");
+            //Пробегаем по набору CV для конкретной таблицы (CV для каждой строки в базу)
+            for (final ContentValues values : contentValuesForTable) {
+                //Поучаем случайно-сгенеринный owner-id идентификатор для текущей табл.
+                ownerIdRndGenerated = values.getAsInteger("owner");
 
-                    //Запись в базу строки и получение реального id для этой строки
-                    long ownerIdAfterInsert = database.insert(tableName, null, values);
-                    values.put("_idAI", ownerIdAfterInsert);
+                //Удаляем идентификатор. Для него нет колонки в таблице
+                values.remove("owner");
 
-                    //Пробегаем по наборам contentValues (CV) каждой таблицы, чтобы найти CV с соответствующим случайно-сгенеринный owner-id
-                    //соответствующим уже записаной строке
-                    for (String tableNameForModifyOwnerId : contentValuesList.keySet()) {
-                        //Получаем нбор CV для конкретной таблицы
-                        ArrayList<ContentValues> contentValuesForModifyOwnerId = contentValuesList.get(tableNameForModifyOwnerId);
+                Map<String, List<Integer>> joinTablesIds = new HashMap<>();
+                List<String> valuesForRemove = new ArrayList<>();
+                for (final String valueName : values.keySet()) {
+                    if (valueName.startsWith("joinedValue_")) {
+                        valuesForRemove.add(valueName);
+                        String joinedTableName = valueName.split("_")[1];
+                        final Integer joinId = values.getAsInteger(valueName);
+                        if (joinTablesIds.containsKey(joinedTableName)) {
+                            joinTablesIds.get(joinedTableName).add(joinId);
+                        } else {
+                            joinTablesIds.put(joinedTableName, new ArrayList<Integer>() {{
+                                add(joinId);
+                            }});
+                        }
+                    }
+                }
 
-                        //Пробегаем по набору CV для конкретной таблицы (CV для каждой строки в базу)
-                        for (ContentValues contentValuesForRow : contentValuesForModifyOwnerId) {
-                            //Ищем старый соответствующий случайно-сгенерированный ownerId и заменяем на новый, полученный при записи в базу
-                            if (contentValuesForRow.containsKey("ownerId") && contentValuesForRow.getAsInteger("ownerId").equals(ownerIdRndGenerated)) {
+                for (String valueForRemove : valuesForRemove) {
+                    values.remove(valueForRemove);
+                }
 
-                                //Заменяем старый случайный ownerId на новй, из базы ownerId
-                                contentValuesForRow.put("ownerId", values.getAsInteger("_idAI"));
-                            }
+//                if (values.containsKey("_idAI")) values.remove("_idAI");
+                //Запись в базу строки и получение реального id для этой строки
+                long ownerIdAfterInsert = database.insert(tableName, null, values);
+                values.put("_idAI", ownerIdAfterInsert);
+
+                for (String joinedTableName : joinTablesIds.keySet()) {
+                    for (Integer joinId : joinTablesIds.get(joinedTableName)) {
+                        Table<JoinAuxEntity> auxTable = tableFactory.getTable(
+                                tableName + "_" + joinedTableName + GlobalConstants.AUX_TAB_SUFFIX);
+                        auxTable.add(new JoinAuxEntity((int) ownerIdAfterInsert, joinId));
+                    }
+                }
+
+                //Пробегаем по наборам contentValues (CV) каждой таблицы, чтобы найти CV с соответствующим случайно-сгенеринный owner-id
+                //соответствующим уже записаной строке
+                for (String tableNameForModifyOwnerId : contentValuesList.keySet()) {
+                    //Получаем нбор CV для конкретной таблицы
+                    ArrayList<ContentValues> contentValuesForModifyOwnerId = contentValuesList.get(tableNameForModifyOwnerId);
+
+                    //Пробегаем по набору CV для конкретной таблицы (CV для каждой строки в базу)
+                    for (ContentValues contentValuesForRow : contentValuesForModifyOwnerId) {
+                        //Ищем старый соответствующий случайно-сгенерированный ownerId и заменяем на новый, полученный при записи в базу
+                        if (contentValuesForRow.containsKey("ownerId") && contentValuesForRow.getAsInteger("ownerId").equals(ownerIdRndGenerated)) {
+
+                            //Заменяем старый случайный ownerId на новй, из базы ownerId
+                            contentValuesForRow.put("ownerId", values.getAsInteger("_idAI"));
                         }
                     }
                 }
             }
 
+
             for (String tableName : contentValuesList.keySet()) {
                 for (ContentValues values : contentValuesList.get(tableName)) {
                     Integer idAfterInsert = values.getAsInteger("_idAI");
                     values.remove("_idAI");
-                    edit(tableName, idAfterInsert, values);
+                    this.edit(tableName, idAfterInsert, values);
                 }
             }
 
@@ -256,7 +286,8 @@ public class Table<T> implements DbProvider<T> {
 
         try {
             resultId = add(item, 0);
-        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
+        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException |
+                InvocationTargetException | ClassNotFoundException e) {
             e.printStackTrace();
         }
 
@@ -271,7 +302,7 @@ public class Table<T> implements DbProvider<T> {
 
         try {
             contentValues = generateContentValues(item);
-        } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException | InstantiationException e) {
+        } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException | InstantiationException | ClassNotFoundException e) {
             e.printStackTrace();
         }
 
@@ -343,12 +374,13 @@ public class Table<T> implements DbProvider<T> {
         this.tableName = tableName;
     }
 
-    private ContentValues generateContentValues(T item) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    private ContentValues generateContentValues(@NotNull T item)
+            throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, ClassNotFoundException {
+        long randomKey;
         ContentValues contentValues = new ContentValues();
-        Object invokedResultGetMethod = null;
+        Object resultInvokeGetMethod = null;
         List<Field> fields = new ArrayList<>();
         tablesFinished.put(getTableName(), false);
-        long randomKey = Math.round(Math.random() * 1000000);
 
         if (SimpleTypesDefinition.isSimpleType(item.getClass())) {
             SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, item.getClass().getSimpleName(), item);
@@ -357,69 +389,105 @@ public class Table<T> implements DbProvider<T> {
                 fields.addAll(Arrays.asList(cls.getDeclaredFields()));
             }
 
-            Class<?> aClass = item.getClass();
             for (Field field : fields) {
                 Class<?> fieldType = field.getType();
                 String fieldName = field.getName();
                 if (field.isAnnotationPresent(Id.class)) continue;
 
-                for (Method method : aClass.getMethods()) {
+                for (Method method : item.getClass().getMethods()) {
                     if (method.getName().toLowerCase().startsWith("get") || method.getName().toLowerCase().startsWith("is")) {
                         if (method.getName().toLowerCase().endsWith(fieldName.toLowerCase())) {
                             if (method.getName().length() == (fieldName.length() + 3) || method.getName().length() == (fieldName.length() + 2)) {
                                 try {
                                     //Получение значения поля
-                                    invokedResultGetMethod = method.invoke(item);
-                                    if (invokedResultGetMethod == null) continue;
+                                    resultInvokeGetMethod = method.invoke(item);
+                                    if (resultInvokeGetMethod == null) continue;
                                 } catch (IllegalAccessException | InvocationTargetException e) {
                                     e.printStackTrace();
                                 }
+
                                 if (field.isAnnotationPresent(Column.class)) {
-                                    if (SimpleTypesDefinition.isSimpleType(fieldType)) {
-                                        SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, fieldName, invokedResultGetMethod);
-                                    } else {
+                                    if (!SimpleTypesDefinition.isSimpleType(fieldType)) {
                                         if (!fieldType.equals(List.class) && !fieldType.equals(Map.class)) {
-                                            throw new IllegalArgumentException("Not simple classes must be annotated as @JoinColumn" +
-                                                    field.getName() + " - is not simple!");
+                                            throw new IllegalArgumentException("Not simple types must be annotated as \"@JoinColumn\". " +
+                                                    field.getType().getName() + " - is not simple type! Table: " + getTableName());
                                         }
                                     }
 
-                                    if (fieldType.equals(List.class)) {
-                                        Type genericType = field.getGenericType();
-                                        if (genericType instanceof ParameterizedType) {
-                                            for (Table joinTable : joinTables) {
-                                                if (joinTable.getTableName().equals(fieldName + "_" + entityClass.getSimpleName() + AUX_TAB_SUFFIX)) {
-                                                    assert invokedResultGetMethod != null;
-                                                    for (Object o : ((List<?>) invokedResultGetMethod)) {
-                                                        contentValues.put("owner", randomKey);
-                                                        joinTable.add(o, randomKey);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                                    generateContentValuesFromColumn(contentValues, resultInvokeGetMethod, field);
                                 }
                                 if (field.isAnnotationPresent(JoinColumn.class)) {
-                                    //Получение таблицы из общего списка таблиц
-                                    Table table = tableFactory.getTable(fieldName);
-                                    //Поиск записи в join-таблице соответствующее значению поля в главной таблице
-                                    List<Entity> joinedTableObjects = table.find(invokedResultGetMethod);
-                                    Entity entity = !joinedTableObjects.isEmpty() ? joinedTableObjects.get(0) : null;
-                                    assert entity != null;
-                                    //Получение ID записи
-                                    int entityId = entity.getId();
-                                    //Добавление ID в главную таблицу, указывающего на запись в join-таблице
-                                    contentValues.put(fieldName, entityId);
+                                    if (SimpleTypesDefinition.isSimpleType(fieldType)) {
+                                        throw new IllegalArgumentException("Simple types must be annotated as \"@Column\". " +
+                                                field.getType().getName() + " - is simple type! Table: " + getTableName());
+                                    }
+
+                                    generateContentValuesFromJoinColumn(contentValues, resultInvokeGetMethod, field);
                                 }
                             }
                         }
                     }
                 }
             }
-
         }
         tablesFinished.put(getTableName(), true);
         return contentValues;
+    }
+
+    private void generateContentValuesFromColumn(ContentValues contentValues, Object resultInvokeGetMethod, Field field) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, ClassNotFoundException {
+        Class<?> fieldType = field.getType();
+        String fieldName = field.getName();
+
+        long randomKey;
+        SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, fieldName, resultInvokeGetMethod);
+
+        if (fieldType.equals(List.class)) {
+            Type genericType = field.getGenericType();
+            if (genericType instanceof ParameterizedType) {
+                for (Table joinTable : joinTables) {
+                    if (joinTable.getTableName().equals(fieldName + "_" + entityClass.getSimpleName() + JOIN_TAB_SUFFIX)) {
+                        for (Object o : ((List<?>) resultInvokeGetMethod)) {
+                            randomKey = Math.round(Math.random() * 1000000);
+                            contentValues.put("owner", randomKey);
+                            joinTable.add(o, randomKey);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void generateContentValuesFromJoinColumn(ContentValues contentValues, Object resultInvokeGetMethod, Field field) throws ClassNotFoundException {
+        Class<?> fieldType = field.getType();
+        String fieldName = field.getName();
+        if (!SimpleTypesDefinition.isSimpleType(fieldType) && !fieldType.equals(List.class)) {
+            //Получение таблицы из общего списка таблиц
+            Table joinedTable = tableFactory.getTable(fieldName);
+            //Поиск записи в join-таблице, соответствующее значению поля в главной таблице
+            List<EntityObject> joinedTableObjects = joinedTable.find(resultInvokeGetMethod);
+            EntityObject joinedObject = !joinedTableObjects.isEmpty() ? joinedTableObjects.get(0) : null;
+            assert joinedObject != null;
+            //Получение ID записи
+            int entityId = joinedObject.getId();
+            //Добавление ID в главную таблицу, указывающего на запись в join-таблице
+            contentValues.put(fieldName, entityId);
+        }
+
+        if (fieldType.equals(List.class)) {
+            Class<?> genericClass = SimpleTypesDefinition.getClassOfGenericFromField(field);
+
+            if (genericClass != null) {
+                Table joinedTable = tableFactory.getTable(genericClass);
+                int i = 0;
+                for (Object listElement : ((List<?>) resultInvokeGetMethod)) {
+                    List<EntityObject> list = joinedTable.find(listElement);
+                    if (!list.isEmpty()) {
+                        int joinedElementId = list.get(0).getId();
+                        contentValues.put("joinedValue_" + joinedTable.getTableName() + "_" + i++, joinedElementId);
+                    }
+                }
+            }
+        }
     }
 
     private List<T> getDataFromCursor(Cursor cursor) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
@@ -460,7 +528,7 @@ public class Table<T> implements DbProvider<T> {
                             Method method = entityClass.getMethod(methodName, fieldType);
                             if (fieldType.equals(List.class)) {
                                 Table joinedTable = tableFactory.getTable(
-                                        fieldName + "_" + entityClass.getSimpleName() + GlobalConstants.AUX_TAB_SUFFIX);
+                                        fieldName + "_" + entityClass.getSimpleName() + GlobalConstants.JOIN_TAB_SUFFIX);
                                 List objectsForOwner = joinedTable.filterByOwnerId(entityId);
                                 method.invoke(instance, objectsForOwner);
                             } else {
@@ -496,18 +564,34 @@ public class Table<T> implements DbProvider<T> {
         return this.tableFactory;
     }
 
-    public void setTableFactory(TableFactory tableFactory) {
+    void setTableFactory(TableFactory tableFactory) {
         this.tableFactory = tableFactory;
     }
 
     private List<Field> findFieldsByAnnotation(Class<? extends Annotation> annotation, T item) {
-        ArrayList<Field> fields = new ArrayList<>();
+        ArrayList<Field> filteredFields = new ArrayList<>();
 
-        for (Field field : item.getClass().getDeclaredFields()) {
-            if (field.isAnnotationPresent(annotation)) {
-                fields.add(field);
+        for (Class cls = item.getClass(); cls != null; cls = cls.getSuperclass()) {
+            for (Field declaredField : cls.getDeclaredFields()) {
+                if (declaredField.isAnnotationPresent(annotation)) {
+                    filteredFields.add(declaredField);
+                }
             }
         }
-        return fields;
+
+        return filteredFields;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Table<?> table = (Table<?>) o;
+        return Objects.equals(tableName, table.tableName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(tableName);
     }
 }

@@ -10,15 +10,15 @@ import ua.in.korneiko.hiberlite.Table;
 import ua.in.korneiko.hiberlite.TableFactory;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
     public static final String LOG_TAG = "MyLog";
     private TableFactory tableFactory;
     private DataBase dataBase;
-    private Table<Company> companyTable;
-    private Table<Post> postTable;
-    private Table<LegalAddress> legalAddressTable;
+
+    private Table<Branch> branchTable;
 
     private Post worker;
     private Post leader;
@@ -27,83 +27,64 @@ public class MainActivity extends AppCompatActivity {
 
     private LegalAddress legalAddress;
 
+    private Employee krychun;
+    private Employee aKorneiko;
+
+    //TODO Need to implements! Check for uniqueness for fields with @SearchKey annotation
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        dataBase = new DataBase(this, "testDB");
+        tableFactory = new TableFactory(dataBase.getDatabase());
 
         worker = new Post("Worker", 1.0);
         leader = new Post("Leader", 1.1);
         teamLeader = new Post("Team Leader", 1.3);
         ceo = new Post("CEO", 1.6);
 
-        legalAddress = new LegalAddress(66400, "Poland", "Gorzow WLKP", "Pilsudskiego 9, 511b");
+        krychun = new Employee("Roman", "Krychun", 10000, leader);
+        aKorneiko = new Employee("Andrey", "Korneiko", 40000, teamLeader);
 
-        dataBase = new DataBase(this, "testDB");
-        tableFactory = new TableFactory(dataBase.getDatabase());
+        legalAddress = new LegalAddress(66400, "Poland", "Gorzow", "Pilsudskiego 9");
 
-        companyTable = tableFactory.createTable(Company.class);
-        postTable = tableFactory.createTable(Post.class);
-        legalAddressTable = tableFactory.createTable(LegalAddress.class);
+        Table<Post> postTable = tableFactory.createTable(Post.class);
+        Table<Employee> employeeTable = tableFactory.createTable(Employee.class);
+        Table<LegalAddress> legalAddressTable = tableFactory.createTable(LegalAddress.class);
+        branchTable = tableFactory.createTable(Branch.class);
 
-        postTable.add(worker);
-        postTable.add(leader);
-        postTable.add(teamLeader);
-        postTable.add(ceo);
-        legalAddressTable.add(legalAddress);
+        if (postTable.find(worker).isEmpty()) {
+            postTable.add(worker);
+            postTable.add(leader);
+            postTable.add(teamLeader);
+            postTable.add(ceo);
+
+            employeeTable.add(krychun);
+            employeeTable.add(aKorneiko);
+
+            legalAddressTable.add(legalAddress);
+        }
     }
 
     public void onClickAdd(View view) {
-
-        final Employee dvoretskaya = new Employee("Oksans", "Dvoretskaya", 22000, worker);
-        final Employee tanya = new Employee("Tatyana", "Chorna", 31000, worker);
-        final Employee teamLeaderLondonBranch = new Employee("Mariana", "Benca", 35000, teamLeader);
-        final Employee teamLeaderUSABranch = new Employee("Anastasia", "Nic", 36000, teamLeader);
-
-        final Branch londonBranch = new Branch("Europe-branch", "London, Holms street, 9", new ArrayList<Employee>() {{
-            add(new Employee("Alex", "Rootoff", 50000, ceo));
-            add(new Employee("Roman", "Krychun", 10000, leader));
-        }}) {{
-            setHeadmaster(teamLeaderLondonBranch);
-            setOtherListData(new ArrayList<String>() {{
-                add("first");
-                add("second");
-                add("third");
-            }});
+        List<Employee> employees = new ArrayList<Employee>() {{
+            add(krychun);
+            add(aKorneiko);
         }};
 
-        final Branch usaBranch = new Branch("USA-branch", "NY, Wall Street, 22", new ArrayList<Employee>() {{
-            add(new Employee("Andrey", "Korneiko", 40000, teamLeader));
-            add(new Employee("Roman", "Miroshnik", 12000, worker));
-        }}) {{
-            setHeadmaster(teamLeaderUSABranch);
-            setOtherListData(new ArrayList<String>() {{
-                add("fourth");
-                add("fifth");
-                add("sixth");
-            }});
-        }};
+        Branch mainBranch = new Branch("Main Branch", legalAddress, employees);
 
+        long branchId = branchTable.add(mainBranch);
 
-        Company company = new Company("Alfa-Company", legalAddress, new ArrayList<Branch>() {{
-            add(londonBranch);
-            add(usaBranch);
-        }});
+        Log.d(LOG_TAG, "Id: " + branchId);
 
-        company.setMainOfficeEmployees(new ArrayList<Employee>() {{
-            add(dvoretskaya);
-            add(tanya);
-        }});
-
-        long id = companyTable.add(company);
-
-        Log.d(LOG_TAG, "ID: " + id);
     }
 
     public void onClickGetId1(View view) {
 
-        Company company = companyTable.find(1);
-        Log.d(LOG_TAG, company.toString());
+
     }
 
     public void onClickGetAll(View view) {

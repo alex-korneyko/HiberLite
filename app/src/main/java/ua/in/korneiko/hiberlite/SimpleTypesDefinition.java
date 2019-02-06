@@ -3,11 +3,9 @@ package ua.in.korneiko.hiberlite;
 import android.content.ContentValues;
 import android.database.Cursor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.lang.reflect.*;
 import java.util.Date;
 
 public class SimpleTypesDefinition {
@@ -131,5 +129,24 @@ public class SimpleTypesDefinition {
             }
         }
         return invoke;
+    }
+
+    @Nullable
+    static Class<?> getClassOfGenericFromField(@NotNull Field field) {
+
+        Class<?> genericClass = null;
+
+        Type genericType = field.getGenericType();
+        if (genericType instanceof ParameterizedType) {
+            String actualTypeArgument = ((ParameterizedType) genericType).getActualTypeArguments()[0].toString();
+            String classForName = actualTypeArgument.split(" ")[1];
+            try {
+                genericClass = Class.forName(classForName);
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return genericClass;
     }
 }
