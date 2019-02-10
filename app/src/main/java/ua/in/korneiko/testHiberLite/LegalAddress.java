@@ -1,9 +1,10 @@
 package ua.in.korneiko.testHiberLite;
 
+import ua.in.korneiko.hiberlite.EntityObject;
 import ua.in.korneiko.hiberlite.annotations.*;
 
 @Entity
-public class LegalAddress implements ua.in.korneiko.hiberlite.Entity {
+public class LegalAddress implements EntityObject {
 
     @Column
     @Id

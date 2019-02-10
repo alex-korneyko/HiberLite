@@ -2,7 +2,7 @@ package ua.in.korneiko.hiberlite;
 
 import org.jetbrains.annotations.Contract;
 
-public interface Entity {
+public interface EntityObject {
 
     int getId();
 

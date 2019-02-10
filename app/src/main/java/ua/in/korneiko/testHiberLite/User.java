@@ -1,12 +1,10 @@
 package ua.in.korneiko.testHiberLite;
 
-import ua.in.korneiko.hiberlite.annotations.Autoincrement;
-import ua.in.korneiko.hiberlite.annotations.Column;
-import ua.in.korneiko.hiberlite.annotations.Entity;
-import ua.in.korneiko.hiberlite.annotations.Id;
+import ua.in.korneiko.hiberlite.EntityObject;
+import ua.in.korneiko.hiberlite.annotations.*;
 
 @Entity
-public class User {
+public class User implements EntityObject {
 
     @Column
     @Id
@@ -14,10 +12,15 @@ public class User {
     private int id;
 
     @Column
+    @SearchKey
     private String userName;
 
     @Column
     private String password;
+
+    @Column
+    private boolean enabled;
+
 
     public User() {
     }
@@ -51,12 +54,21 @@ public class User {
         this.password = password;
     }
 
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
     @Override
     public String toString() {
         return "User{" +
                 "id=" + id +
                 ", userName='" + userName + '\'' +
                 ", password='" + password + '\'' +
+                ", enabled=" + enabled +
                 '}';
     }
 }

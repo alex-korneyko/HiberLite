@@ -74,11 +74,11 @@ public class SimpleTypesDefinition {
             instance = (T) constructor.newInstance(cursor.getDouble(columnIndex));
         }
         if (type.equals(Long.class) || type.equals(long.class)) {
-            Constructor<Long> constructor = Long.class.getConstructor(Long.class);
+            Constructor<Long> constructor = Long.class.getConstructor(long.class);
             instance = (T) constructor.newInstance(cursor.getLong(columnIndex));
         }
         if (type.equals(Boolean.class) || type.equals(boolean.class)) {
-            Constructor<Boolean> constructor = Boolean.class.getConstructor(Boolean.class);
+            Constructor<Boolean> constructor = Boolean.class.getConstructor(boolean.class);
             instance = (T) constructor.newInstance(cursor.getInt(columnIndex) > 0);
         }
         if (type.equals(String.class)) {

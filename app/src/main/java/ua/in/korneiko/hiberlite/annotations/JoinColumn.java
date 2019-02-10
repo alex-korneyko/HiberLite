@@ -13,5 +13,9 @@ public @interface JoinColumn {
 
     FetchMode fetch() default FetchMode.INSTANTLY;
 
-    boolean createIfAbsent() default false;
+    /**
+     *
+     * @return
+     */
+    boolean addIfAbsent() default false;
 }

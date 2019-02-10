@@ -267,9 +267,11 @@ public class Table<T> implements DbProvider<T> {
 
             for (String tableName : contentValuesList.keySet()) {
                 for (ContentValues values : contentValuesList.get(tableName)) {
-                    Integer idAfterInsert = values.getAsInteger("_idAI");
-                    values.remove("_idAI");
-                    this.edit(tableName, idAfterInsert, values);
+                    if (values.containsKey("_idAI")) {
+                        Integer idAfterInsert = values.getAsInteger("_idAI");
+                        values.remove("_idAI");
+                        this.edit(tableName, idAfterInsert, values);
+                    }
                 }
             }
 
@@ -460,15 +462,26 @@ public class Table<T> implements DbProvider<T> {
     private void generateContentValuesFromJoinColumn(ContentValues contentValues, Object resultInvokeGetMethod, Field field) throws ClassNotFoundException {
         Class<?> fieldType = field.getType();
         String fieldName = field.getName();
+        int entityId = 0;
         if (!SimpleTypesDefinition.isSimpleType(fieldType) && !fieldType.equals(List.class)) {
             //Получение таблицы из общего списка таблиц
             Table joinedTable = tableFactory.getTable(fieldName);
             //Поиск записи в join-таблице, соответствующее значению поля в главной таблице
             List<EntityObject> joinedTableObjects = joinedTable.find(resultInvokeGetMethod);
             EntityObject joinedObject = !joinedTableObjects.isEmpty() ? joinedTableObjects.get(0) : null;
-            assert joinedObject != null;
-            //Получение ID записи
-            int entityId = joinedObject.getId();
+
+            if (joinedObject == null) {
+                if (field.getAnnotation(JoinColumn.class).addIfAbsent()) {
+                    throw new UnsupportedOperationException("Not yet implemented!!!");
+//                    entityId = (int) joinedTable.add(resultInvokeGetMethod);
+                } else {
+                    throw new MissingResourceException("No data in database for join column", fieldType.getName(), fieldName);
+                }
+            } else {
+                //Получение ID записи
+                entityId = joinedObject.getId();
+            }
+
             //Добавление ID в главную таблицу, указывающего на запись в join-таблице
             contentValues.put(fieldName, entityId);
         }

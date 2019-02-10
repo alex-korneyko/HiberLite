@@ -1,12 +1,10 @@
 package ua.in.korneiko.testHiberLite;
 
-import ua.in.korneiko.hiberlite.annotations.Autoincrement;
-import ua.in.korneiko.hiberlite.annotations.Column;
-import ua.in.korneiko.hiberlite.annotations.Entity;
-import ua.in.korneiko.hiberlite.annotations.Id;
+import ua.in.korneiko.hiberlite.EntityObject;
+import ua.in.korneiko.hiberlite.annotations.*;
 
 @Entity
-public class Person {
+public class Person implements EntityObject {
 
     @Column
     @Id
@@ -14,9 +12,11 @@ public class Person {
     private int id;
 
     @Column
+    @SearchKey
     private String name;
 
     @Column
+    @SearchKey
     private String surname;
 
     public Person() {

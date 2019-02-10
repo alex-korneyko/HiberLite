@@ -29,6 +29,8 @@ public class MainActivity extends AppCompatActivity {
 
     private Employee krychun;
     private Employee aKorneiko;
+    private User krychunUser;
+    private User korneikoUser;
 
     //TODO Need to implements! Check for uniqueness for fields with @SearchKey annotation
 
@@ -45,12 +47,16 @@ public class MainActivity extends AppCompatActivity {
         teamLeader = new Post("Team Leader", 1.3);
         ceo = new Post("CEO", 1.6);
 
-        krychun = new Employee("Roman", "Krychun", 10000, leader);
-        aKorneiko = new Employee("Andrey", "Korneiko", 40000, teamLeader);
+        krychunUser = new User("krychun", "111");
+        krychun = new Employee("Roman", "Krychun", 10000, leader, krychunUser);
+
+        korneikoUser = new User("korneiko", "123");
+        aKorneiko = new Employee("Andrey", "Korneiko", 40000, teamLeader, korneikoUser);
 
         legalAddress = new LegalAddress(66400, "Poland", "Gorzow", "Pilsudskiego 9");
 
         Table<Post> postTable = tableFactory.createTable(Post.class);
+        Table<User> userTable = tableFactory.createTable(User.class);
         Table<Employee> employeeTable = tableFactory.createTable(Employee.class);
         Table<LegalAddress> legalAddressTable = tableFactory.createTable(LegalAddress.class);
         branchTable = tableFactory.createTable(Branch.class);
@@ -60,6 +66,9 @@ public class MainActivity extends AppCompatActivity {
             postTable.add(leader);
             postTable.add(teamLeader);
             postTable.add(ceo);
+
+            userTable.add(krychunUser);
+            userTable.add(korneikoUser);
 
             employeeTable.add(krychun);
             employeeTable.add(aKorneiko);

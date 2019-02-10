@@ -1,12 +1,13 @@
 package ua.in.korneiko.testHiberLite;
 
+import ua.in.korneiko.hiberlite.EntityObject;
 import ua.in.korneiko.hiberlite.annotations.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-public class Branch {
+public class Branch implements EntityObject {
 
     @Id
     @Autoincrement
@@ -14,33 +15,28 @@ public class Branch {
     private int id;
 
     @Column
+    @SearchKey
     private String branchName;
 
-    @Column
-    private String branchAddress;
+    @JoinColumn
+    private LegalAddress legalAddress;
 
     @JoinColumn
-    private Employee headmaster;
-
-    @Column
     private List<Employee> employees = new ArrayList<>();
-
-    @Column
-    private List<String> otherListData = new ArrayList<>();
 
     public Branch() {
     }
 
-    public Branch(String branchName, String branchAddress, List<Employee> employees) {
+    public Branch(String branchName, LegalAddress legalAddressAddress, List<Employee> employees) {
         this.branchName = branchName;
-        this.branchAddress = branchAddress;
+        this.legalAddress = legalAddressAddress;
         this.employees = employees;
     }
 
-    public Branch(int id, String branchName, String branchAddress, List<Employee> employees) {
+    public Branch(int id, String branchName, LegalAddress legalAddress, List<Employee> employees) {
         this.id = id;
         this.branchName = branchName;
-        this.branchAddress = branchAddress;
+        this.legalAddress = legalAddress;
         this.employees = employees;
     }
 
@@ -60,20 +56,12 @@ public class Branch {
         this.branchName = branchName;
     }
 
-    public String getBranchAddress() {
-        return branchAddress;
+    public LegalAddress getLegalAddress() {
+        return legalAddress;
     }
 
-    public void setBranchAddress(String branchAddress) {
-        this.branchAddress = branchAddress;
-    }
-
-    public Employee getHeadmaster() {
-        return headmaster;
-    }
-
-    public void setHeadmaster(Employee headmaster) {
-        this.headmaster = headmaster;
+    public void setLegalAddress(LegalAddress legalAddress) {
+        this.legalAddress = legalAddress;
     }
 
     public List<Employee> getEmployees() {
@@ -84,23 +72,13 @@ public class Branch {
         this.employees = employees;
     }
 
-    public List<String> getOtherListData() {
-        return otherListData;
-    }
-
-    public void setOtherListData(List<String> otherListData) {
-        this.otherListData = otherListData;
-    }
-
     @Override
     public String toString() {
         return "\nBranch{" +
                 "\n\tid=" + id +
                 ", \n\tbranchName='" + branchName + '\'' +
-                ", \n\tbranchAddress='" + branchAddress + '\'' +
-                ", \n\theadmaster='" + headmaster + '\'' +
+                ", \n\tlegalAddress='" + legalAddress + '\'' +
                 ", \n\temployees=" + employees +
-                ", \n\totherListData=" + otherListData +
                 "\n}";
     }
 }
