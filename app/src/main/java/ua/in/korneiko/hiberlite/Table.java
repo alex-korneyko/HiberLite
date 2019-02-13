@@ -424,6 +424,14 @@ public class Table<T> implements DbProvider<T> {
                                                 field.getType().getName() + " - is simple type! Table: " + getTableName());
                                     }
 
+                                    if (fieldType.equals(List.class) && SimpleTypesDefinition.isSimpleGeneric(field)) {
+                                        throw new IllegalArgumentException(
+                                                "Fields with simple generic types must be annotated as \"@Column\". " +
+                                                        field.getType().getName() + " - parameterized by simple type! " +
+                                                        SimpleTypesDefinition.getClassOfGenericFromField(field) +
+                                                        "Table: " + getTableName());
+                                    }
+
                                     generateContentValuesFromJoinColumn(contentValues, resultInvokeGetMethod, field);
                                 }
                             }
@@ -437,19 +445,20 @@ public class Table<T> implements DbProvider<T> {
     }
 
     private void generateContentValuesFromColumn(ContentValues contentValues, Object resultInvokeGetMethod, Field field) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, ClassNotFoundException {
+
         Class<?> fieldType = field.getType();
         String fieldName = field.getName();
 
-        long randomKey;
         SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, fieldName, resultInvokeGetMethod);
 
         if (fieldType.equals(List.class)) {
             Type genericType = field.getGenericType();
             if (genericType instanceof ParameterizedType) {
                 for (Table joinTable : joinTables) {
+                    //TODO вместо entityClass.getSimpleName() использовать имя таблицы
                     if (joinTable.getTableName().equals(fieldName + "_" + entityClass.getSimpleName() + JOIN_TAB_SUFFIX)) {
                         for (Object o : ((List<?>) resultInvokeGetMethod)) {
-                            randomKey = Math.round(Math.random() * 1000000);
+                            long randomKey = Math.round(Math.random() * 1000000);
                             contentValues.put("owner", randomKey);
                             joinTable.add(o, randomKey);
                         }
@@ -499,6 +508,8 @@ public class Table<T> implements DbProvider<T> {
                         contentValues.put("joinedValue_" + joinedTable.getTableName() + "_" + i++, joinedElementId);
                     }
                 }
+            } else {
+                throw new IllegalArgumentException("Field by type \"List\" must be parameterized");
             }
         }
     }

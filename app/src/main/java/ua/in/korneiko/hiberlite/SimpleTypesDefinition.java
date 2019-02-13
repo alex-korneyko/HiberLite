@@ -149,4 +149,10 @@ public class SimpleTypesDefinition {
 
         return genericClass;
     }
+
+    static boolean isSimpleGeneric(Field field) {
+
+        Class<?> genericClass = getClassOfGenericFromField(field);
+        return isSimpleType(genericClass);
+    }
 }
