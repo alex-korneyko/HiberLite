@@ -40,7 +40,7 @@ public class MainActivity extends AppCompatActivity {
             add("Third string");
         }};
 
-        Company company = new Company("Alpha company", anyStrings, floors);
+        Company company = new Company("Alpha company", anyStrings/*, floors*/);
 
         long id = companyTable.add(company);
 

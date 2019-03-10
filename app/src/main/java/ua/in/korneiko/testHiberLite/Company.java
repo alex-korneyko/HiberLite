@@ -1,15 +1,13 @@
 package ua.in.korneiko.testHiberLite;
 
 import org.jetbrains.annotations.Contract;
-import ua.in.korneiko.hiberlite.EntityObject;
 import ua.in.korneiko.hiberlite.annotations.*;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 @Entity
-public class Company implements EntityObject {
+public class Company {
 
     @Id
     @Autoincrement
@@ -20,30 +18,27 @@ public class Company implements EntityObject {
     @SearchKey
     private String companyName;
 
-    @JoinColumn
-    private LegalAddress legalAddress;
-
     @Column
-    private List<Branch> branches = new ArrayList<>();
+    private List<String> threeAnyStrings;
 
-    //TODO !!! Need to implements! support of Lists in @JoinColumn (Create - OK, Add - NG, Select - NG)
-    @JoinColumn
-    private List<Employee> mainOfficeEmployees = new ArrayList<>();
+//    @Column
+//    private List<Floor> floors;
+
 
     public Company() {
     }
 
-    public Company(String companyName, LegalAddress legalAddress, List<Branch> branches) {
+    public Company(String companyName, List<String> threeAnyStrings/*, List<Floor> floors*/) {
         this.companyName = companyName;
-        this.legalAddress = legalAddress;
-        this.branches = branches;
+        this.threeAnyStrings = threeAnyStrings;
+//        this.floors = floors;
     }
 
-    public Company(int id, String companyName, LegalAddress legalAddress, List<Branch> branches) {
+    public Company(int id, String companyName, List<String> threeAnyStrings, List<Floor> floors) {
         this.id = id;
         this.companyName = companyName;
-        this.legalAddress = legalAddress;
-        this.branches = branches;
+        this.threeAnyStrings = threeAnyStrings;
+//        this.floors = floors;
     }
 
     public int getId() {
@@ -62,40 +57,21 @@ public class Company implements EntityObject {
         this.companyName = companyName;
     }
 
-    public LegalAddress getLegalAddress() {
-        return legalAddress;
+    public List<String> getThreeAnyStrings() {
+        return threeAnyStrings;
     }
 
-    public void setLegalAddress(LegalAddress legalAddress) {
-        this.legalAddress = legalAddress;
+    public void setThreeAnyStrings(List<String> threeAnyStrings) {
+        this.threeAnyStrings = threeAnyStrings;
     }
 
-    public List<Branch> getBranches() {
-        return branches;
-    }
-
-    public void setBranches(List<Branch> branches) {
-        this.branches = branches;
-    }
-
-    public List<Employee> getMainOfficeEmployees() {
-        return mainOfficeEmployees;
-    }
-
-    public void setMainOfficeEmployees(List<Employee> mainOfficeEmployees) {
-        this.mainOfficeEmployees = mainOfficeEmployees;
-    }
-
-    @Override
-    public String toString() {
-        return "Company{" +
-                "\nid=" + id +
-                ", \ncompanyName='" + companyName + '\'' +
-                ", \nmainOfficeEmployees=" + mainOfficeEmployees +
-                ", \nlegalAddress=" + legalAddress +
-                ", \nbranches=" + branches +
-                '}';
-    }
+//    public List<Floor> getFloors() {
+//        return floors;
+//    }
+//
+//    public void setFloors(List<Floor> floors) {
+//        this.floors = floors;
+//    }
 
     @Contract(value = "null -> false", pure = true)
     @Override

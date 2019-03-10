@@ -3,7 +3,6 @@ package ua.in.korneiko.hiberlite;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import org.jetbrains.annotations.NotNull;
 import ua.in.korneiko.hiberlite.annotations.Column;
 import ua.in.korneiko.hiberlite.annotations.Id;
 import ua.in.korneiko.hiberlite.annotations.JoinColumn;
@@ -13,25 +12,22 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
 
-import static ua.in.korneiko.hiberlite.GlobalConstants.JOIN_TAB_SUFFIX;
-
 public class Table<T> implements DbProvider<T> {
 
     //TODO Need to implements! Manipulations with date. Selections with before, after. between
 
-    private static TreeMap<String, ArrayList<ContentValues>> contentValuesList = new TreeMap<>();
-    private static Map<String, Boolean> tablesFinished = new HashMap<>();
     private String rawQueryCreateTableString;
     private Class<T> entityClass;
     private SQLiteDatabase database;
-    private List<Table> joinTables = new ArrayList<>();
+    private List<ContentValues> preparedContentValuesList = new ArrayList<>();
+    private Map<String, Table> joinTables = new HashMap<>();
     private String tableName;
     private TableFactory tableFactory;
 
-    public Table(SQLiteDatabase database, Class<T> entity, List<Table> joinTables) {
+    public Table(SQLiteDatabase database, Class<T> entity, Map<String, Table> joinTables) {
         this.database = database;
         this.entityClass = entity;
-        this.joinTables.addAll(joinTables);
+        this.joinTables.putAll(joinTables);
     }
 
     public String getRawQueryCreateTableString() {
@@ -152,7 +148,7 @@ public class Table<T> implements DbProvider<T> {
     }
 
 
-    private List<T> filterByOwnerId(int ownerId) {
+    private List<T> filterByOwnerId(long ownerId) {
 
         List<T> data = new ArrayList<>();
 
@@ -174,145 +170,46 @@ public class Table<T> implements DbProvider<T> {
         return data;
     }
 
-    private long add(T item, long ownerId)
-            throws NoSuchMethodException, InstantiationException, IllegalAccessException,
-            InvocationTargetException, ClassNotFoundException {
-
-        boolean allTablesFinished = true;
-
-        final ContentValues contentValues = generateContentValues(item);
-        if (ownerId != 0) {
-            contentValues.put("ownerId", ownerId);
-        }
-
-        if (contentValuesList.containsKey(getTableName())) {
-            contentValuesList.get(getTableName()).add(contentValues);
-        } else {
-            contentValuesList.put(getTableName(), new ArrayList<ContentValues>() {{
-                add(contentValues);
-            }});
-        }
-
-        for (String tableName : tablesFinished.keySet()) {
-            allTablesFinished = allTablesFinished && tablesFinished.get(tableName);
-        }
-
-        Integer ownerIdRndGenerated;
-
-        if (allTablesFinished) {
-
-            //Получаем нбор CV для конкретной таблицы
-            ArrayList<ContentValues> contentValuesForTable = contentValuesList.get(getTableName());
-
-            //Пробегаем по набору CV для конкретной таблицы (CV для каждой строки в базу)
-            for (final ContentValues values : contentValuesForTable) {
-                //Поучаем случайно-сгенеринный owner-id идентификатор для текущей табл.
-                ownerIdRndGenerated = values.getAsInteger("owner");
-
-                //Удаляем идентификатор. Для него нет колонки в таблице
-                values.remove("owner");
-
-                Map<String, List<Integer>> joinTablesIds = new HashMap<>();
-                List<String> valuesForRemove = new ArrayList<>();
-                for (final String valueName : values.keySet()) {
-                    if (valueName.startsWith("joinedValue_")) {
-                        valuesForRemove.add(valueName);
-                        String joinedTableName = valueName.split("_")[1];
-                        final Integer joinId = values.getAsInteger(valueName);
-                        if (joinTablesIds.containsKey(joinedTableName)) {
-                            joinTablesIds.get(joinedTableName).add(joinId);
-                        } else {
-                            joinTablesIds.put(joinedTableName, new ArrayList<Integer>() {{
-                                add(joinId);
-                            }});
-                        }
-                    }
-                }
-
-                for (String valueForRemove : valuesForRemove) {
-                    values.remove(valueForRemove);
-                }
-
-//                if (values.containsKey("_idAI")) values.remove("_idAI");
-                //Запись в базу строки и получение реального id для этой строки
-                long ownerIdAfterInsert = database.insert(tableName, null, values);
-                values.put("_idAI", ownerIdAfterInsert);
-
-                for (String joinedTableName : joinTablesIds.keySet()) {
-                    for (Integer joinId : joinTablesIds.get(joinedTableName)) {
-                        Table<JoinAuxEntity> auxTable = tableFactory.getTable(
-                                tableName + "_" + joinedTableName + GlobalConstants.AUX_TAB_SUFFIX);
-                        auxTable.add(new JoinAuxEntity((int) ownerIdAfterInsert, joinId));
-                    }
-                }
-
-                //Пробегаем по наборам contentValues (CV) каждой таблицы, чтобы найти CV с соответствующим случайно-сгенеринный owner-id
-                //соответствующим уже записаной строке
-                for (String tableNameForModifyOwnerId : contentValuesList.keySet()) {
-                    //Получаем нбор CV для конкретной таблицы
-                    ArrayList<ContentValues> contentValuesForModifyOwnerId = contentValuesList.get(tableNameForModifyOwnerId);
-
-                    //Пробегаем по набору CV для конкретной таблицы (CV для каждой строки в базу)
-                    for (ContentValues contentValuesForRow : contentValuesForModifyOwnerId) {
-                        //Ищем старый соответствующий случайно-сгенерированный ownerId и заменяем на новый, полученный при записи в базу
-                        if (contentValuesForRow.containsKey("ownerId") && contentValuesForRow.getAsInteger("ownerId").equals(ownerIdRndGenerated)) {
-
-                            //Заменяем старый случайный ownerId на новй, из базы ownerId
-                            contentValuesForRow.put("ownerId", values.getAsInteger("_idAI"));
-                        }
-                    }
-                }
-            }
-
-
-            for (String tableName : contentValuesList.keySet()) {
-                for (ContentValues values : contentValuesList.get(tableName)) {
-                    if (values.containsKey("_idAI")) {
-                        Integer idAfterInsert = values.getAsInteger("_idAI");
-                        values.remove("_idAI");
-                        this.edit(tableName, idAfterInsert, values);
-                    }
-                }
-            }
-
-            contentValuesList.clear();
-        }
-
-        return 0;
-    }
-
     @Override
     public long add(T item) {
 
-        long resultId = 0L;
+        generateContentValues(item);
+        List<Long> ids = this.savePreparedContentValuesToDB();
 
-        try {
-            resultId = add(item, 0);
-        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException |
-                InvocationTargetException | ClassNotFoundException e) {
-            e.printStackTrace();
+        for (String joinTableName : joinTables.keySet()) {
+            Table joinTable = joinTables.get(joinTableName);
+            joinTable.savePreparedContentValuesToDB(ids.get(0));
         }
 
-        return resultId;
+        return ids.get(0);
+    }
+
+    private List<Long> savePreparedContentValuesToDB() {
+
+        ArrayList<Long> ids = new ArrayList<>();
+
+        for (ContentValues contentValues : preparedContentValuesList) {
+            ids.add(database.insert(this.getTableName(), null, contentValues));
+        }
+
+        preparedContentValuesList.clear();
+
+        return ids;
+    }
+
+    private List<Long> savePreparedContentValuesToDB(long ownerId) {
+
+        for (ContentValues contentValues : preparedContentValuesList) {
+            contentValues.put("ownerId", ownerId);
+        }
+
+        return this.savePreparedContentValuesToDB();
     }
 
     @Override
     public boolean edit(int id, T item) {
 
-        ContentValues contentValues = null;
-        int updateId = 0;
-
-        try {
-            contentValues = generateContentValues(item);
-        } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException | InstantiationException | ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-
-        if (contentValues != null) {
-            updateId = database.update(getTableName(), contentValues, "id=?", new String[]{String.valueOf(id)});
-        }
-
-        return updateId > 0;
+        return true;
     }
 
     private boolean edit(String tableName, int id, ContentValues values) {
@@ -340,6 +237,98 @@ public class Table<T> implements DbProvider<T> {
 
 
         return update > 0;
+    }
+
+    public void generateContentValues(T item) {
+
+        ContentValues contentValues = new ContentValues();
+
+        if (SimpleTypesDefinition.isSimpleType(item.getClass())) {
+            SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, item);
+            addContentValues(contentValues);
+            return;
+        }
+
+        ArrayList<Field> fields = new ArrayList<>();
+
+        for (Class c = item.getClass(); c != null; c = c.getSuperclass()) {
+            fields.addAll(Arrays.asList(c.getDeclaredFields()));
+        }
+
+        for (Field field : fields) {
+            field.setAccessible(true);
+
+            if (field.isAnnotationPresent(Column.class)) {
+                if (!SimpleTypesDefinition.isSimpleType(field) && !(field.getType().equals(List.class) || field.getType().equals(Map.class))) {
+                    throw new IllegalArgumentException("For not simple types needs use @JoinColumn annotations. " +
+                            field.getType().getName() + " - is not simple type");
+                }
+
+                addValueToContentValuesFromColumnAnnotatedField(contentValues, item, field);
+            }
+
+            if (field.isAnnotationPresent(JoinColumn.class)  && !(field.getType().equals(List.class) || field.getType().equals(Map.class))) {
+                if (SimpleTypesDefinition.isSimpleType(field)) {
+                    throw new IllegalArgumentException("For simple types needs use @Column annotations. " +
+                            field.getType().getName() + " - is simple type");
+                }
+                if (SimpleTypesDefinition.isSimpleGenericType(field)) {
+                    throw new IllegalArgumentException("For simple generic types needs use @Column annotations. " +
+                            SimpleTypesDefinition.getClassOfGenericFromField(field).getName() + " - is simple generic type");
+                }
+
+                addValueToContentValuesFromJoinColumnAnnotation(contentValues, item, field);
+            }
+        }
+
+        addContentValues(contentValues);
+    }
+
+    private void addValueToContentValuesFromColumnAnnotatedField(ContentValues contentValues, T item, Field field) {
+
+        String columnName = field.getAnnotation(Column.class).columnName().equals("") ?
+                field.getName() :
+                field.getAnnotation(Column.class).columnName();
+
+        //Если поле простого типа, то просто добавление в contentValues
+        if (SimpleTypesDefinition.isSimpleType(field.getType())) {
+            try {
+                SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, item, field);
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+
+        //Если поле типизированный список
+        if (field.getType().equals(List.class)) {
+            Class<?> genericClass = SimpleTypesDefinition.getClassOfGenericFromField(field);
+            if (genericClass == null) {
+                throw new IllegalArgumentException(List.class.getName() + " must be parameterized." +
+                        " Field: " + field.getName() +
+                        " Table: " + getTableName());
+            }
+
+            List fieldValues = new ArrayList();
+            try {
+                fieldValues.addAll((Collection) SimpleTypesDefinition.fieldGetValue(field, item));
+            } catch (InvocationTargetException | IllegalAccessException e) {
+                e.printStackTrace();
+            }
+
+            if (SimpleTypesDefinition.isSimpleType(genericClass)) {
+                String joinTableName = columnName + "_" + item.getClass().getSimpleName() + GlobalConstants.JOIN_TAB_SUFFIX;
+                Table joinTable = joinTables.get(joinTableName);
+                for (Object fieldValue : fieldValues) {
+                    joinTable.generateContentValues(fieldValue);
+                }
+            } else {
+                
+            }
+        }
+    }
+
+    private void addValueToContentValuesFromJoinColumnAnnotation(ContentValues contentValues, T item, Field field) {
+
     }
 
     @Override
@@ -374,144 +363,6 @@ public class Table<T> implements DbProvider<T> {
 
     public void setTableName(String tableName) {
         this.tableName = tableName;
-    }
-
-    private ContentValues generateContentValues(@NotNull T item)
-            throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, ClassNotFoundException {
-        long randomKey;
-        ContentValues contentValues = new ContentValues();
-        Object resultInvokeGetMethod = null;
-        List<Field> fields = new ArrayList<>();
-        tablesFinished.put(getTableName(), false);
-
-        if (SimpleTypesDefinition.isSimpleType(item.getClass())) {
-            SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, item.getClass().getSimpleName(), item);
-        } else {
-            for (Class cls = item.getClass(); cls != null; cls = cls.getSuperclass()) {
-                fields.addAll(Arrays.asList(cls.getDeclaredFields()));
-            }
-
-            for (Field field : fields) {
-                Class<?> fieldType = field.getType();
-                String fieldName = field.getName();
-                if (field.isAnnotationPresent(Id.class)) continue;
-
-                for (Method method : item.getClass().getMethods()) {
-                    if (method.getName().toLowerCase().startsWith("get") || method.getName().toLowerCase().startsWith("is")) {
-                        if (method.getName().toLowerCase().endsWith(fieldName.toLowerCase())) {
-                            if (method.getName().length() == (fieldName.length() + 3) || method.getName().length() == (fieldName.length() + 2)) {
-                                try {
-                                    //Получение значения поля
-                                    resultInvokeGetMethod = method.invoke(item);
-                                    if (resultInvokeGetMethod == null) continue;
-                                } catch (IllegalAccessException | InvocationTargetException e) {
-                                    e.printStackTrace();
-                                }
-
-                                if (field.isAnnotationPresent(Column.class)) {
-                                    if (!SimpleTypesDefinition.isSimpleType(fieldType)) {
-                                        if (!fieldType.equals(List.class) && !fieldType.equals(Map.class)) {
-                                            throw new IllegalArgumentException("Not simple types must be annotated as \"@JoinColumn\". " +
-                                                    field.getType().getName() + " - is not simple type! Table: " + getTableName());
-                                        }
-                                    }
-
-                                    generateContentValuesFromColumn(contentValues, resultInvokeGetMethod, field);
-                                }
-                                if (field.isAnnotationPresent(JoinColumn.class)) {
-                                    if (SimpleTypesDefinition.isSimpleType(fieldType)) {
-                                        throw new IllegalArgumentException("Simple types must be annotated as \"@Column\". " +
-                                                field.getType().getName() + " - is simple type! Table: " + getTableName());
-                                    }
-
-                                    if (fieldType.equals(List.class) && SimpleTypesDefinition.isSimpleGeneric(field)) {
-                                        throw new IllegalArgumentException(
-                                                "Fields with simple generic types must be annotated as \"@Column\". " +
-                                                        field.getType().getName() + " - parameterized by simple type! " +
-                                                        SimpleTypesDefinition.getClassOfGenericFromField(field) +
-                                                        "Table: " + getTableName());
-                                    }
-
-                                    generateContentValuesFromJoinColumn(contentValues, resultInvokeGetMethod, field);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        tablesFinished.put(getTableName(), true);
-        return contentValues;
-    }
-
-    private void generateContentValuesFromColumn(ContentValues contentValues, Object resultInvokeGetMethod, Field field) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, ClassNotFoundException {
-
-        Class<?> fieldType = field.getType();
-        String fieldName = field.getName();
-
-        SimpleTypesDefinition.invokeContentValuesPutMethod(contentValues, fieldName, resultInvokeGetMethod);
-
-        if (fieldType.equals(List.class)) {
-            Type genericType = field.getGenericType();
-            if (genericType instanceof ParameterizedType) {
-                for (Table joinTable : joinTables) {
-                    //TODO вместо entityClass.getSimpleName() использовать имя таблицы
-                    if (joinTable.getTableName().equals(fieldName + "_" + entityClass.getSimpleName() + JOIN_TAB_SUFFIX)) {
-                        for (Object o : ((List<?>) resultInvokeGetMethod)) {
-                            long randomKey = Math.round(Math.random() * 1000000);
-                            contentValues.put("owner", randomKey);
-                            joinTable.add(o, randomKey);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private void generateContentValuesFromJoinColumn(ContentValues contentValues, Object resultInvokeGetMethod, Field field) throws ClassNotFoundException {
-        Class<?> fieldType = field.getType();
-        String fieldName = field.getName();
-        int entityId = 0;
-        if (!SimpleTypesDefinition.isSimpleType(fieldType) && !fieldType.equals(List.class)) {
-            //Получение таблицы из общего списка таблиц
-            Table joinedTable = tableFactory.getTable(fieldName);
-            //Поиск записи в join-таблице, соответствующее значению поля в главной таблице
-            List<EntityObject> joinedTableObjects = joinedTable.find(resultInvokeGetMethod);
-            EntityObject joinedObject = !joinedTableObjects.isEmpty() ? joinedTableObjects.get(0) : null;
-
-            if (joinedObject == null) {
-                if (field.getAnnotation(JoinColumn.class).addIfAbsent()) {
-                    throw new UnsupportedOperationException("Not yet implemented!!!");
-//                    entityId = (int) joinedTable.add(resultInvokeGetMethod);
-                } else {
-                    throw new MissingResourceException("No data in database for join column", fieldType.getName(), fieldName);
-                }
-            } else {
-                //Получение ID записи
-                entityId = joinedObject.getId();
-            }
-
-            //Добавление ID в главную таблицу, указывающего на запись в join-таблице
-            contentValues.put(fieldName, entityId);
-        }
-
-        if (fieldType.equals(List.class)) {
-            Class<?> genericClass = SimpleTypesDefinition.getClassOfGenericFromField(field);
-
-            if (genericClass != null) {
-                Table joinedTable = tableFactory.getTable(genericClass);
-                int i = 0;
-                for (Object listElement : ((List<?>) resultInvokeGetMethod)) {
-                    List<EntityObject> list = joinedTable.find(listElement);
-                    if (!list.isEmpty()) {
-                        int joinedElementId = list.get(0).getId();
-                        contentValues.put("joinedValue_" + joinedTable.getTableName() + "_" + i++, joinedElementId);
-                    }
-                }
-            } else {
-                throw new IllegalArgumentException("Field by type \"List\" must be parameterized");
-            }
-        }
     }
 
     private List<T> getDataFromCursor(Cursor cursor) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
@@ -604,6 +455,18 @@ public class Table<T> implements DbProvider<T> {
         }
 
         return filteredFields;
+    }
+
+    void addContentValues(ContentValues values) {
+        this.preparedContentValuesList.add(values);
+    }
+
+    public List<ContentValues> getPreparedContentValuesList() {
+        return preparedContentValuesList;
+    }
+
+    public void setPreparedContentValuesList(List<ContentValues> preparedContentValuesList) {
+        this.preparedContentValuesList = preparedContentValuesList;
     }
 
     @Override

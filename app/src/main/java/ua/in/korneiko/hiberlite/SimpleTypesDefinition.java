@@ -4,9 +4,12 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import ua.in.korneiko.hiberlite.annotations.Column;
 
 import java.lang.reflect.*;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 public class SimpleTypesDefinition {
 
@@ -93,32 +96,57 @@ public class SimpleTypesDefinition {
         return instance;
     }
 
-    static <T> void invokeContentValuesPutMethod(ContentValues contentValues, String columnName, @NotNull T item) {
+    static void invokeContentValuesPutMethod(ContentValues contentValues, Object item, Field field) throws IllegalAccessException {
 
-        if (item instanceof Integer) {
-            contentValues.put(columnName, (Integer) item);
-        }
-        if (item instanceof Double) {
-            contentValues.put(columnName, (Double) item);
-        }
-        if (item instanceof Long) {
-            contentValues.put(columnName, (Long) item);
-        }
-        if (item instanceof Boolean) {
-            contentValues.put(columnName, (Boolean) item);
-        }
-        if (item instanceof String) {
-            contentValues.put(columnName, (String) item);
-        }
-        if (item instanceof Date) {
-            contentValues.put(columnName, ((Date) item).getTime());
-        }
+        String columnName = field.getAnnotation(Column.class).columnName().equals("") ?
+                field.getName() :
+                field.getAnnotation(Column.class).columnName();
 
+        if (field.getType().equals(Integer.class)) {
+            contentValues.put(columnName, (Integer) field.get(item));
+        }
+        if (field.getType().equals(Double.class)) {
+            contentValues.put(columnName, (Double) field.get(item));
+        }
+        if (field.getType().equals(Long.class)) {
+            contentValues.put(columnName, (Long) field.get(item));
+        }
+        if (field.getType().equals(Boolean.class)) {
+            contentValues.put(columnName, (Boolean) field.get(item));
+        }
+        if (field.getType().equals(String.class)) {
+            contentValues.put(columnName, (String) field.get(item));
+        }
+        if (field.getType().equals(Date.class)) {
+            contentValues.put(columnName, ((Date) field.get(item)).getTime());
+        }
     }
 
-    static <T> Object fieldGetValue(Field field, T object) throws InvocationTargetException, IllegalAccessException {
+    public static void invokeContentValuesPutMethod(ContentValues contentValues, Object item) {
+
+        if (item.getClass().equals(Integer.class)) {
+            contentValues.put(item.getClass().getSimpleName(), (Integer) item);
+        }
+        if (item.getClass().equals(Double.class)) {
+            contentValues.put(item.getClass().getSimpleName(), (Double) item);
+        }
+        if (item.getClass().equals(Long.class)) {
+            contentValues.put(item.getClass().getSimpleName(), (Long) item);
+        }
+        if (item.getClass().equals(Boolean.class)) {
+            contentValues.put(item.getClass().getSimpleName(), (Boolean) item);
+        }
+        if (item.getClass().equals(String.class)) {
+            contentValues.put(item.getClass().getSimpleName(), (String) item);
+        }
+        if (item.getClass().equals(Date.class)) {
+            contentValues.put(item.getClass().getSimpleName(), ((Date) item).getTime());
+        }
+    }
+
+    static <T, F> F fieldGetValue(Field item, T object) throws InvocationTargetException, IllegalAccessException {
         Object invoke = null;
-        String fieldName = field.getName();
+        String fieldName = item.getName();
         for (Method method : object.getClass().getMethods()) {
             if (method.getName().toLowerCase().startsWith("get") || method.getName().toLowerCase().startsWith("is")) {
                 if (method.getName().toLowerCase().endsWith(fieldName.toLowerCase())) {
@@ -128,15 +156,15 @@ public class SimpleTypesDefinition {
                 }
             }
         }
-        return invoke;
+        return (F) invoke;
     }
 
     @Nullable
-    static Class<?> getClassOfGenericFromField(@NotNull Field field) {
+    static Class<?> getClassOfGenericFromField(@NotNull Field item) {
 
         Class<?> genericClass = null;
 
-        Type genericType = field.getGenericType();
+        Type genericType = item.getGenericType();
         if (genericType instanceof ParameterizedType) {
             String actualTypeArgument = ((ParameterizedType) genericType).getActualTypeArguments()[0].toString();
             String classForName = actualTypeArgument.split(" ")[1];
@@ -150,9 +178,14 @@ public class SimpleTypesDefinition {
         return genericClass;
     }
 
-    static boolean isSimpleGeneric(Field field) {
+    static boolean isSimpleGenericType(Field item) {
 
-        Class<?> genericClass = getClassOfGenericFromField(field);
+        Class<?> genericClass = getClassOfGenericFromField(item);
         return isSimpleType(genericClass);
+    }
+
+    public static <T> List<T> getParameterizedList(Class<T> classParameter) {
+
+        return new ArrayList<>();
     }
 }

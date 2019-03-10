@@ -1,14 +1,12 @@
 package ua.in.korneiko.hiberlite;
 
+import android.content.Context;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
-import android.support.annotation.Nullable;
 import android.util.Log;
 import ua.in.korneiko.hiberlite.annotations.*;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.util.*;
 
 import static ua.in.korneiko.hiberlite.GlobalConstants.AUX_TAB_SUFFIX;
@@ -19,14 +17,12 @@ public class TableFactory {
 
     //TODO Need to implements! TableUpdate (if the class-entity was changed)
 
-    private static Map<String, List<Table>> joinTables;
-    private Map<String, Table> tables;
+    private static Map<String, Map<String, Table>> joinTables = new HashMap<>();
+    private Map<String, Table> tables = new HashMap<>();
     private SQLiteDatabase database;
 
-    public TableFactory(SQLiteDatabase sqLiteDatabase) {
-        this.database = sqLiteDatabase;
-        tables = new HashMap<>();
-        joinTables = new HashMap<>();
+    public TableFactory(@org.jetbrains.annotations.NotNull Context context) {
+        database = context.openOrCreateDatabase(context.getPackageName(), Context.MODE_PRIVATE, null);
     }
 
     public <T> Table<T> createTable(Class<T> entityClass) {
@@ -105,7 +101,7 @@ public class TableFactory {
 
         //Создание оэкземпляра Table
         Table<T> table = new Table<>(database, entityClass,
-                joinTables.containsKey(determinedTableName) ? joinTables.get(determinedTableName) : new ArrayList<Table>());
+                joinTables.containsKey(determinedTableName) ? joinTables.get(determinedTableName) : new HashMap<String, Table>());
 
         table.setRawQueryCreateTableString(query.toString());
         table.setTableName(determinedTableName);
@@ -120,7 +116,7 @@ public class TableFactory {
 
         Class entityClass = table.getEntityClass();
 
-        if (!entityClass.isAnnotationPresent(EntityObject.class)) {
+        if (!entityClass.isAnnotationPresent(Entity.class)) {
             return false;
         }
 
@@ -194,7 +190,7 @@ public class TableFactory {
 //            }
 
 //            if (field.isAnnotationPresent(Column.class)) {
-                createJoinTable(field, ownerTable, ownerTableName);
+            createJoinTable(field, ownerTable, ownerTableName);
 //            }
             return false;
         }
@@ -231,40 +227,28 @@ public class TableFactory {
                             ownerTableName + "_" + getTable(genericFromField).getTableName() + AUX_TAB_SUFFIX);
 
             if (joinTables.containsKey(ownerTableName)) {
-                joinTables.get(ownerTableName).add(joinAuxTable);
+                joinTables.get(ownerTableName).put(joinAuxTable.getTableName(), joinAuxTable);
             } else {
-                joinTables.put(ownerTableName, new ArrayList<Table>() {{add(joinAuxTable);}});
+                joinTables.put(ownerTableName, new HashMap<String, Table>() {{
+                    put(joinAuxTable.getTableName(), joinAuxTable);
+                }});
             }
             return;
         }
 
-        Type genericType = field.getGenericType();
+        Class<?> genericClass = SimpleTypesDefinition.getClassOfGenericFromField(field);
 
-        if (!(genericType instanceof ParameterizedType)) {
-            throw new IllegalArgumentException("Type \"List<?>\" is not parameterized");
-        }
-
-        ParameterizedType parameterizedType = (ParameterizedType) genericType;
-
-        try {
-            Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
-            String actualTypeArgument = actualTypeArguments[0].toString();
-            String classForName = actualTypeArgument.split(" ")[1];
-            Class<?> genericClass = Class.forName(classForName);
-            if (genericClass.isAnnotationPresent(ua.in.korneiko.hiberlite.annotations.Entity.class) || SimpleTypesDefinition.isSimpleType(genericClass)) {
-                final Table<?> table = createTable(genericClass,
-                        field.getName() + "_" + owner.getSimpleName() + JOIN_TAB_SUFFIX);
-                if (joinTables.containsKey(ownerTableName)) {
-                    joinTables.get(ownerTableName).add(table);
-                } else {
-                    joinTables.put(ownerTableName, new ArrayList<Table>() {{
-                        add(table);
-                    }});
-                }
+//        if (genericClass.isAnnotationPresent(ua.in.korneiko.hiberlite.annotations.Entity.class) || SimpleTypesDefinition.isSimpleType(genericClass)) {
+            final Table<?> table = createTable(genericClass,
+                    field.getName() + "_" + owner.getSimpleName() + JOIN_TAB_SUFFIX);
+            if (joinTables.containsKey(ownerTableName)) {
+                joinTables.get(ownerTableName).put(table.getTableName(), table);
+            } else {
+                joinTables.put(ownerTableName, new HashMap<String, Table>() {{
+                    put(table.getTableName(), table);
+                }});
             }
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
+//        }
     }
 
     public <T> Table<T> getTable(String tableNameName) {
